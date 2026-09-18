@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Prisma가 자동 생성한 코드 — 린트 대상이 아님
+    "prisma/generated/**",
   ]),
 ]);
 

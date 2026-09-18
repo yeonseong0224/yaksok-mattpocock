@@ -1,0 +1,18 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../prisma/generated"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+/// 연결 확인용 최소 테이블. ERD 확정 후 본 설계로 교체합니다.
+model User {
+  id        String   @id @default(uuid()) @db.Uuid
+  kakaoId   String?  @unique @map("kakao_id")
+  nickname  String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("users")
+}
