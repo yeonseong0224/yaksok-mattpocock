@@ -18,7 +18,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 ## 스택 (임의로 바꾸지 말 것)
 
 - Next.js 16 App Router + TypeScript (웹과 챗봇 API를 한 프로젝트에서)
-- Prisma 7 + @prisma/adapter-pg + PostgreSQL (Neon)
+- Prisma 7 + @prisma/adapter-pg + PostgreSQL (개발: 로컬 Docker / 운영: Neon)
 - Tailwind CSS 4
 
 ## 버전
@@ -37,7 +37,8 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 ## DB와 마이그레이션
 
-- 개발·운영 DB는 별도의 Neon 브랜치 또는 프로젝트로 분리한다.
+- 개발 DB는 각자 로컬 Docker(`compose.yaml`의 postgres)를 쓰고, 운영 DB는 Neon을 쓴다. 둘은 분리한다.
+- Postgres 메이저 버전은 Docker와 Neon 모두 17로 맞춘다.
 - 개발자마다 자기 개발 DB를 사용한다.
 - 개발 DB의 스키마 변경은 `prisma migrate dev`로 마이그레이션 파일을 남긴다.
 - 운영 DB에는 커밋된 마이그레이션을 `prisma migrate deploy`로 적용한다.
