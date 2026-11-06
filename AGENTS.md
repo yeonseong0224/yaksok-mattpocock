@@ -44,7 +44,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - 운영 DB에는 커밋된 마이그레이션을 `prisma migrate deploy`로 적용한다.
 - `db push`는 사용하지 않는다.
 - 리셋은 삭제 가능한 개인 개발 DB에 한해 허용한다.
-- 공유 개발 DB의 리셋은 팀원과 협의하고, 운영 DB는 리셋하지 않는다.
+- 개인 개발 DB(로컬 Docker)는 `docker compose down -v`로 리셋할 수 있고, 운영 DB는 리셋하지 않는다.
 
 ## 비밀값
 
