@@ -9,11 +9,11 @@
 | yaksok (워크스페이스 루트) | https://app.notion.com/p/39f7085f318280cc929be4cdf17b76a6 |
 | 문서 구조 | https://app.notion.com/p/4067085f31828038bc8dcea69375316f |
 
-## 스펙 → `docs/product/`
+## 스펙 → `docs/specs/product/`
 | 문서 | Notion | 변환 |
 | --- | --- | --- |
-| PRD | https://app.notion.com/p/39f7085f318280cf8399fd2b34379762 | `product/PRD.md`, `product/MVP_SCOPE.md` |
-| USER STORY (Backlog) | https://app.notion.com/p/3d37085f318280049b7ae8c6f4b2e6f2 | `product/user-stories/USER_STORIES.md` |
+| PRD | https://app.notion.com/p/39f7085f318280cf8399fd2b34379762 | `specs/product/PRD.md`, `specs/product/MVP_SCOPE.md` |
+| USER STORY (Backlog) | https://app.notion.com/p/3d37085f318280049b7ae8c6f4b2e6f2 | `specs/product/user-stories/USER_STORIES.md` |
 
 ## 설계 → `docs/specs/`, `docs/architecture/`
 | 문서 | Notion | 변환 |
