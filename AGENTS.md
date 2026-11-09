@@ -59,6 +59,10 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - 약속 관리자 권한과 참여 링크 권한을 분리한다.
   참여 링크만으로 관리자 권한을 얻을 수 없어야 한다.
 
+## 화면 디자인
+
+- 화면을 구현하기 전에 `docs/design/FIGMA.md`에서 해당 프레임을 찾아 Figma MCP로 확인한다. Figma와 스펙이 다르면 스펙을 따른다(차이점은 그 문서에 정리돼 있다).
+
 ## 현재 상태
 
 - ERD 확정. (5개 테이블)
