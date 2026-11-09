@@ -7,12 +7,91 @@ datasource db {
   provider = "postgresql"
 }
 
-/// 연결 확인용 최소 테이블. ERD 확정 후 본 설계로 교체합니다.
-model User {
-  id        String   @id @default(uuid()) @db.Uuid
-  kakaoId   String?  @unique @map("kakao_id")
-  nickname  String?
-  createdAt DateTime @default(now()) @map("created_at")
+// ERD: docs/architecture/DATABASE.md
+// Prisma로 표현할 수 없는 CHECK 제약과 "방장은 약속당 한 명" 부분 UNIQUE 인덱스는
+// 마이그레이션 SQL(…_erd_schema/migration.sql)에 직접 작성되어 있다.
 
-  @@map("users")
+/// 초대 링크. 연결된 promise가 없으면 아직 선점되지 않은 링크다.
+model PromiseLink {
+  id          String   @id @default(uuid()) @db.Uuid
+  inviteToken String   @unique @map("invite_token") @db.VarChar(64)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  promise Promise?
+
+  @@map("promise_links")
+}
+
+/// 약속 설정·상태·확정 결과. 설정 컬럼은 draft에서만 NULL을 허용한다(CHECK).
+model Promise {
+  id               String    @id @default(uuid()) @db.Uuid
+  promiseLinkId    String    @unique @map("promise_link_id") @db.Uuid
+  /// 1~30자 상한은 서버가 검증한다(글자 단위가 코드 포인트와 다를 수 있음). DB는 비어 있지 않고 앞뒤 공백이 없는지만 본다.
+  title            String?   @db.VarChar(200)
+  participantLimit Int?      @map("participant_limit")
+  dateRangeStart   DateTime? @map("date_range_start") @db.Date
+  dateRangeEnd     DateTime? @map("date_range_end") @db.Date
+  dailyStartMinute Int?      @map("daily_start_minute") @db.SmallInt
+  dailyEndMinute   Int?      @map("daily_end_minute") @db.SmallInt
+  durationMinutes  Int?      @map("duration_minutes")
+  votingDeadlineAt DateTime? @map("voting_deadline_at") @db.Timestamptz(3)
+  /// draft | collecting | closed | confirmed | cancelled
+  status           String    @default("draft") @db.VarChar(16)
+  confirmedStartAt DateTime? @map("confirmed_start_at") @db.Timestamptz(3)
+  cancelledAt      DateTime? @map("cancelled_at") @db.Timestamptz(3)
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  promiseLink  PromiseLink   @relation(fields: [promiseLinkId], references: [id], onDelete: Restrict)
+  participants Participant[]
+
+  @@map("promises")
+}
+
+/// 약속별 참여자(방장 포함). 전역 회원 테이블은 없다.
+model Participant {
+  id                      String    @id @default(uuid()) @db.Uuid
+  promiseId               String    @map("promise_id") @db.Uuid
+  nickname                String    @db.VarChar(200)
+  normalizedNickname      String    @map("normalized_nickname") @db.VarChar(200)
+  passwordHash            String    @map("password_hash") @db.VarChar(255)
+  /// host | member
+  role                    String    @db.VarChar(16)
+  /// active | cancelled
+  status                  String    @default("active") @db.VarChar(16)
+  availabilitySubmittedAt DateTime? @map("availability_submitted_at") @db.Timestamptz(3)
+  availabilityVersion     Int       @default(0) @map("availability_version")
+  cancelledAt             DateTime? @map("cancelled_at") @db.Timestamptz(3)
+  createdAt               DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  promise        Promise                    @relation(fields: [promiseId], references: [id], onDelete: Restrict)
+  availableSlots ParticipantAvailableSlot[]
+  sessions       ParticipantSession[]
+
+  @@unique([promiseId, normalizedNickname])
+  @@map("participants")
+}
+
+/// 30분 가능 슬롯 한 칸. 구간은 [slot_start_at, slot_start_at + 30분).
+model ParticipantAvailableSlot {
+  id            String   @id @default(uuid()) @db.Uuid
+  participantId String   @map("participant_id") @db.Uuid
+  slotStartAt   DateTime @map("slot_start_at") @db.Timestamptz(3)
+
+  participant Participant @relation(fields: [participantId], references: [id], onDelete: Restrict)
+
+  @@unique([participantId, slotStartAt])
+  @@map("participant_available_slots")
+}
+
+/// 로그인 유지 세션. 원본 토큰은 쿠키에만 있고 DB에는 해시만 저장한다.
+model ParticipantSession {
+  id               String   @id @default(uuid()) @db.Uuid
+  participantId    String   @map("participant_id") @db.Uuid
+  sessionTokenHash String   @unique @map("session_token_hash") @db.VarChar(128)
+  expiresAt        DateTime @map("expires_at") @db.Timestamptz(3)
+
+  participant Participant @relation(fields: [participantId], references: [id], onDelete: Restrict)
+
+  @@index([participantId])
+  @@map("participant_sessions")
 }

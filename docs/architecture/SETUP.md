@@ -179,9 +179,9 @@ npm run dev
 | 주소 | 기대 결과 |
 | --- | --- |
 | `http://localhost:3000` | Next.js 기본 화면 |
-| `http://localhost:3000/api/health` | `{"ok":true,"userCount":0}` |
+| `http://localhost:3000/api/health` | `{"ok":true}` |
 
-> 🎉 `/api/health`에서 `{"ok":true,"userCount":0}`가 나오면 **Next.js → Prisma → 내 로컬 Docker DB까지 전부 연결된 것**입니다. 환경 구축 완료입니다.
+> 🎉 `/api/health`에서 `{"ok":true}`가 나오면 **Next.js → Prisma → 내 로컬 Docker DB까지 전부 연결된 것**입니다. 환경 구축 완료입니다.
 >
 > 안 되면 아래 「자주 터지는 오류」를 먼저 보시고, 그래도 안 되면 **30분 이상 혼자 붙잡지 말고** 이슈 DB에 등록하세요.
 
@@ -194,7 +194,8 @@ npm run dev
 | `app/` | 화면과 API. App Router라 폴더 구조가 곧 URL입니다 |
 | `app/api/health/route.ts` | 연결 확인용 API. DB에 붙는지 볼 때 씁니다 |
 | `lib/prisma.ts` | **Prisma 싱글턴.** DB를 쓸 때는 항상 여기서 import합니다 |
-| `prisma/schema.prisma` | DB 스키마. 현재는 연결 확인용 `users` 하나뿐 |
+| `prisma/schema.prisma` | DB 스키마. ERD(`docs/architecture/DATABASE.md`)의 테이블 5개. CHECK·부분 UNIQUE는 마이그레이션 SQL에 직접 작성 |
+| `test/` | 테스트 하네스. 테스트 DB 준비(`global-setup.ts`), 테스트마다 비우기(`setup.ts`), 라우트 핸들러 호출 도우미(`http.ts`) |
 | `prisma/migrations/` | 마이그레이션 기록. **Git으로 공유**되고 각자 DB에 적용합니다 |
 | `prisma/generated/` | 자동 생성 코드. Git에 안 올라가고 `prisma generate`로 만듭니다 |
 | `prisma7.config.ts` | Prisma CLI 설정. DB 주소를 환경변수에서 읽습니다 |
@@ -307,6 +308,18 @@ npx prisma generate
 
 `prisma db push`는 사용하지 않습니다. 변경 기록이 안 남아서 팀원 DB와 어긋납니다.
 
+### 4-3-1. 테스트 실행
+
+```bash
+docker compose up -d   # 로컬 Postgres가 떠 있어야 합니다
+npm test               # 한 번 실행 (감시 모드는 npm run test:watch)
+```
+
+- 테스트는 같은 Docker Postgres 안의 **별도 데이터베이스 `yaksok_test`**를 씁니다. 개발 DB(`yaksok`)는 건드리지 않습니다.
+- 처음 실행하면 `yaksok_test`를 만들고 커밋된 마이그레이션을 `migrate deploy`로 적용합니다. 테스트마다 모든 테이블을 비웁니다.
+- 주소는 `.env`의 `TEST_DATABASE_URL`에서 읽습니다(`.env.example` 참고). 데이터베이스 이름이 `_test`로 끝나지 않으면 실행을 거부합니다.
+- API 테스트는 `test/http.ts`의 `createTestClient()`로 라우트 핸들러에 `Request`를 넣고 `Response`를 검증합니다. 클라이언트 하나가 브라우저 하나처럼 쿠키를 주고받습니다. 이 도우미로 테스트하려면 핸들러는 쿠키를 `cookies()`가 아니라 `request.cookies`로 읽어야 합니다.
+
 ### 4-4. 유용한 명령
 
 ```bash
@@ -360,7 +373,7 @@ npx prisma studio   # 브라우저로 DB 테이블 보기 · 값 직접 입력 �
 | 항목 | 내용 |
 | --- | --- |
 | 브랜치 보호 미작동 | GitHub 룰셋은 비공개 저장소에서 Pro 이상이 필요합니다. **GitHub Education(Student Developer Pack)** 을 신청하면 Pro를 무료로 받아 해결됩니다. 승인까지 며칠 걸리니 미리 신청해두는 게 좋습니다. 저장소를 공개로 전환하는 방법도 있지만 팀 논의가 필요합니다 |
-| ERD 확정 | 현재 스키마는 연결 확인용 `users` 하나뿐입니다. 확정되면 [ERD 페이지](https://app.notion.com/p/39f7085f318280af9894f5df721d848f) 기준으로 테이블을 하나씩 추가합니다. **배포 전까지는 마이그레이션을 리셋해 깨끗하게 다시 시작할 수 있습니다** |
+| ERD 확정 | ✅ 2026-11-09 ERD의 5개 테이블로 교체했습니다(`…_erd_schema` 마이그레이션). |
 | 배포 | **Vercel + Neon** 권장. Render 무료 플랜은 15분 유휴 후 잠들어 깨어나는 데 1분이 걸려서, 카카오의 5초 응답 제한을 못 맞춥니다. 무료 DB도 30일 후 만료됩니다 |
 | 운영 DB 분리 | 배포 시 개발용과 별도의 Neon 프로젝트(또는 브랜치)를 씁니다. 운영 DB에는 `prisma migrate deploy`만 사용합니다 |
 
