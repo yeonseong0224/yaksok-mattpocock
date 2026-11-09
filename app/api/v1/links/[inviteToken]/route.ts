@@ -27,11 +27,18 @@ export async function GET(
   if (!link) return linkNotFound();
   if (link.expired) return linkExpired();
 
-  const promiseStatus = link.promiseStatus ?? "unclaimed";
+  // GET은 계산만 한다: 만료된 draft는 아직 아무도 등록하지 않은 링크로, 마감이 지난 모집은 마감으로 보인다.
+  // 만료된 draft의 실제 삭제는 다음 방장 등록 같은 쓰기 요청이 한다(STATE-02-02).
+  const promiseStatus =
+    !link.promiseStatus || link.draftExpired
+      ? "unclaimed"
+      : link.deadlinePassed
+        ? "closed"
+        : link.promiseStatus;
   return NextResponse.json({
     inviteToken,
     promiseStatus,
-    promiseId: link.promiseId,
+    promiseId: promiseStatus === "unclaimed" ? null : link.promiseId,
     nextAction: NEXT_ACTION[promiseStatus],
     pollAfterMs: promiseStatus === "draft" ? SETUP_POLL_MS : null,
   });

@@ -187,6 +187,7 @@ participants.status의 active·cancelled는 약속 상태 enum과 다른 값이�
 - **HTTP Method:** GET
 - **Endpoint:** `/api/v1/promises/{promiseId}`
 - **Authentication Required:** 예 — 약속별 세션 쿠키
+  > **2026-11-09 (첫 슬라이스 스펙, 티켓 03 구현)**: 세션이 없거나 이 약속의 active 참여자가 아니면 401 대신 `200 { promiseId, promiseStatus }`(상태만)를 돌려준다. 다른 약속의 세션 쿠키는 Path가 달라 전달되지 않으므로, "다른 약속 소속"도 이 경우에 포함된다(쓰기 API에서는 401).
 - **Content Type:** application/json; charset=utf-8
 - 성공 응답은 기존 MEMBER와 같은 래퍼 없는 JSON이다. 필드·URI·조회 페이지 크기 등 기술 계약은 아래와 같이 정하며 새로운 제품 정책을 추가하지 않는다.
 
@@ -569,6 +570,7 @@ if (!response.ok) {
 - **HTTP Method:** POST
 - **Endpoint:** `/api/v1/promises/{promiseId}/close`
 - **Authentication Required:** 예 — 약속별 세션 쿠키
+  > **2026-11-09 (첫 슬라이스 스펙, 티켓 03 구현)**: 세션이 없거나 이 약속의 active 참여자가 아니면 401 대신 `200 { promiseId, promiseStatus }`(상태만)를 돌려준다. 다른 약속의 세션 쿠키는 Path가 달라 전달되지 않으므로, "다른 약속 소속"도 이 경우에 포함된다(쓰기 API에서는 401).
 - **Content Type:** application/json; charset=utf-8
 - 성공 응답은 기존 MEMBER와 같은 래퍼 없는 JSON이다. 필드·URI·조회 페이지 크기 등 기술 계약은 아래와 같이 정하며 새로운 제품 정책을 추가하지 않는다.
 
@@ -698,6 +700,7 @@ if (!response.ok) {
 - **HTTP Method:** POST
 - **Endpoint:** `/api/v1/promises/{promiseId}/confirmation`
 - **Authentication Required:** 예 — 약속별 세션 쿠키
+  > **2026-11-09 (첫 슬라이스 스펙, 티켓 03 구현)**: 세션이 없거나 이 약속의 active 참여자가 아니면 401 대신 `200 { promiseId, promiseStatus }`(상태만)를 돌려준다. 다른 약속의 세션 쿠키는 Path가 달라 전달되지 않으므로, "다른 약속 소속"도 이 경우에 포함된다(쓰기 API에서는 401).
 - **Content Type:** application/json; charset=utf-8
 - 성공 응답은 기존 MEMBER와 같은 래퍼 없는 JSON이다. 필드·URI·조회 페이지 크기 등 기술 계약은 아래와 같이 정하며 새로운 제품 정책을 추가하지 않는다.
 
@@ -1191,6 +1194,7 @@ closed·confirmed 약속을 collecting으로 다시 열고 새 마감과 선택 
 - **HTTP Method:** GET
 - **Endpoint:** `/api/v1/promises/{promiseId}/candidates`
 - **Authentication Required:** 예 — 약속별 세션 쿠키
+  > **2026-11-09 (첫 슬라이스 스펙, 티켓 03 구현)**: 세션이 없거나 이 약속의 active 참여자가 아니면 401 대신 `200 { promiseId, promiseStatus }`(상태만)를 돌려준다. 다른 약속의 세션 쿠키는 Path가 달라 전달되지 않으므로, "다른 약속 소속"도 이 경우에 포함된다(쓰기 API에서는 401).
 - **Content Type:** application/json; charset=utf-8
 - 성공 응답은 기존 MEMBER와 같은 래퍼 없는 JSON이다. 필드·URI·조회 페이지 크기 등 기술 계약은 아래와 같이 정하며 새로운 제품 정책을 추가하지 않는다.
 

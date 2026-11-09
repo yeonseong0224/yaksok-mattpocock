@@ -1,0 +1,79 @@
+import { expect } from "vitest";
+import { POST as issueLinkRoute } from "@/app/api/v1/links/route";
+import { GET as lookUpLinkRoute } from "@/app/api/v1/links/[inviteToken]/route";
+import { POST as registerHostRoute } from "@/app/api/v1/links/[inviteToken]/host/route";
+import { GET as getPromiseRoute } from "@/app/api/v1/promises/[promiseId]/route";
+import { POST as startRoute } from "@/app/api/v1/promises/[promiseId]/start/route";
+import { defaultVotingDeadline } from "@/lib/promises/start-settings";
+import { addDays, kstDate } from "@/lib/time";
+import type { TestClient } from "./http";
+
+// 여러 테스트 파일이 쓰는 사용자 흐름 단계. 각 단계는 실제 API를 호출한다.
+
+export async function issueLink(client: TestClient): Promise<string> {
+  const res = await client.request(issueLinkRoute, { method: "POST", path: "/api/v1/links" });
+  expect(res.status).toBe(201);
+  return (res.body as { inviteToken: string }).inviteToken;
+}
+
+export function lookUpLink(client: TestClient, inviteToken: string) {
+  return client.request(lookUpLinkRoute, {
+    path: `/api/v1/links/${inviteToken}`,
+    params: { inviteToken },
+  });
+}
+
+export function registerHost(
+  client: TestClient,
+  inviteToken: string,
+  body: unknown = { nickname: "승주", pin: "4827" },
+) {
+  return client.request(registerHostRoute, {
+    method: "POST",
+    path: `/api/v1/links/${inviteToken}/host`,
+    params: { inviteToken },
+    body,
+  });
+}
+
+/** 링크를 발급하고 방장으로 등록한다. 클라이언트에 방장 세션 쿠키가 남는다. */
+export async function createDraftPromise(client: TestClient) {
+  const inviteToken = await issueLink(client);
+  const res = await registerHost(client, inviteToken);
+  expect(res.status).toBe(201);
+  return { inviteToken, promiseId: (res.body as { promiseId: string }).promiseId };
+}
+
+export function getPromise(client: TestClient, promiseId: string) {
+  return client.request(getPromiseRoute, {
+    path: `/api/v1/promises/${promiseId}`,
+    params: { promiseId },
+  });
+}
+
+/** 지금 기준으로 통과하는 모집 시작 요청 본문. 시작일은 모레, 종료일은 그 7일 뒤. */
+export function validStartBody(overrides: Record<string, unknown> = {}) {
+  const now = new Date();
+  const startDate = addDays(kstDate(now), 2);
+  const endDate = addDays(startDate, 7);
+  return {
+    title: "팀 저녁 모임",
+    participantLimit: 4,
+    dateRange: { startDate, endDate },
+    votingDeadlineAt: defaultVotingDeadline(now, endDate).toISOString(),
+    ...overrides,
+  };
+}
+
+export function startCollecting(
+  client: TestClient,
+  promiseId: string,
+  body: unknown = validStartBody(),
+) {
+  return client.request(startRoute, {
+    method: "POST",
+    path: `/api/v1/promises/${promiseId}/start`,
+    params: { promiseId },
+    body,
+  });
+}

@@ -5,6 +5,7 @@ import { rejectForeignOrigin } from "@/lib/api/origin";
 import { apiError, invalidRequest, readJsonObject } from "@/lib/api/responses";
 import { linkExpired, linkNotFound } from "@/lib/links/errors";
 import { lockLink } from "@/lib/links/link-state";
+import { deleteDraft, DRAFT_TTL_MINUTES } from "@/lib/promises/promise-state";
 import { normalizeNickname } from "@/lib/members/nickname";
 import { hashPin } from "@/lib/members/pin";
 import { isValidPin } from "@/lib/members/pin-format";
@@ -12,12 +13,9 @@ import {
   DRAFT_SESSION_SECONDS,
   issueSession,
   setSessionCookie,
-  type IssuedSession,
+  type SessionCookie,
 } from "@/lib/members/session";
 import { addMinutes, toKstIso } from "@/lib/time";
-
-/** draft는 생성 후 이 시간 안에 설정을 마쳐야 한다(STATE-02-02) */
-const DRAFT_TTL_MINUTES = 10;
 
 type Outcome =
   | { kind: "not_found" }
@@ -27,7 +25,7 @@ type Outcome =
       kind: "created";
       participantId: string;
       draftExpiresAt: Date;
-      session: IssuedSession;
+      session: SessionCookie;
     };
 
 // MEMBER-API-02 방장 등록(약속 생성). 링크를 먼저 선점한 사람이 방장이 된다.
@@ -60,8 +58,11 @@ export async function POST(
       const link = await lockLink(tx, inviteToken);
       if (!link) return { kind: "not_found" };
       if (link.expired) return { kind: "expired" };
-      // 만료된 draft를 정리하고 새 방장을 받는 처리는 티켓 03(STATE-02-02)에서 여기에 들어온다.
-      if (link.promiseId) return { kind: "taken" };
+      if (link.promiseId) {
+        // 10분 안에 설정을 마치지 못한 draft는 지우고 이 사람을 새 방장으로 받는다(STATE-02-02).
+        if (!link.draftExpired) return { kind: "taken" };
+        await deleteDraft(tx, link.promiseId);
+      }
 
       const promise = await tx.promise.create({
         data: { promiseLinkId: link.linkId, status: "draft" },
