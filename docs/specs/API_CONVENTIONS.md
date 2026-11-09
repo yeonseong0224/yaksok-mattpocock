@@ -89,6 +89,7 @@
 - **저장:** 원본 토큰은 브라우저에만 두고 서버는 `participant_sessions.session_token_hash`에 해시만 저장한다.
 - **다중 기기:** 여러 기기 동시 로그인을 허용하고 기기별 세션을 따로 둔다 (MEMBER-04-02).
 - **매 요청 재검증:** 세션 만료, 참여자 `status = active`, 약속 현재 상태를 요청마다 다시 확인한다. 클라이언트가 보낸 `isHost`·`participantId`는 믿지 않는다.
+- **구현:** 라우트 핸들러는 쿠키를 `next/headers`의 `cookies()`가 아니라 `request.cookies`로 읽고, 응답(`NextResponse`)의 `cookies.set`으로 쓴다. 테스트 도우미(`test/http.ts`)가 핸들러를 Next 요청 컨텍스트 밖에서 직접 호출하기 때문이다.
 
 ### 5.1 쿠키 Path가 만드는 제약 — 반드시 지킬 것
 

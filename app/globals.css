@@ -1,26 +1,25 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/* Figma 와이어프레임(docs/design/FIGMA.md)에서 가져온 색. 와이어프레임은 밝은 화면만 있다. */
+@theme {
+  --color-canvas: #f6f7fa;
+  --color-surface: #ffffff;
+  --color-line: #e3e6ec;
+  --color-ink: #1f2937;
+  --color-muted: #6b7280;
+  --color-brand: #3f63d9;
+  --color-brand-strong: #2f4fb8;
+  --color-brand-ink: #2747a8;
+  --color-danger: #c0392b;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
+  --font-sans: var(--font-geist-sans), "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
 }
