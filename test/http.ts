@@ -26,6 +26,7 @@ export type TestRequest<P> = {
   params?: P;
   /** JSON으로 직렬화해 보낸다. */
   body?: unknown;
+  /** 기본 헤더를 덮어쓴다. 상태를 바꾸는 요청에는 기본으로 같은 사이트의 `origin`이 붙는다. */
   headers?: Record<string, string>;
 };
 
@@ -81,7 +82,10 @@ export function createTestClient() {
       handler: RouteHandler<P>,
       req: TestRequest<P>,
     ): Promise<TestResponse> {
-      const headers = new Headers(req.headers);
+      const method = req.method ?? "GET";
+      // 브라우저처럼 상태를 바꾸는 요청에는 같은 사이트의 Origin을 붙인다(CSRF 검사 통과용).
+      const headers = new Headers(method === "GET" ? {} : { origin: BASE_URL });
+      for (const [name, value] of Object.entries(req.headers ?? {})) headers.set(name, value);
       const cookieHeader = cookieHeaderFor(req.path);
       if (cookieHeader) headers.set("cookie", cookieHeader);
       let body: string | undefined;
@@ -91,7 +95,7 @@ export function createTestClient() {
       }
 
       const request = new NextRequest(new URL(req.path, BASE_URL), {
-        method: req.method ?? "GET",
+        method,
         headers,
         body,
       });
@@ -163,3 +167,5 @@ function pathMatches(requestPath: string, cookiePath: string): boolean {
   if (!pathname.startsWith(cookiePath)) return false;
   return cookiePath.endsWith("/") || pathname[cookiePath.length] === "/";
 }
+
+export type TestClient = ReturnType<typeof createTestClient>;
