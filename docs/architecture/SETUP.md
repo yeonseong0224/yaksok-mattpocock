@@ -89,7 +89,13 @@ code --install-extension bradlc.vscode-tailwindcss
 >
 > 네 개 중 **Prettier가 특히 중요**합니다. `.vscode/settings.json`에서 기본 포매터로 지정해둔 터라, 없으면 저장할 때 자동 정렬이 조용히 안 먹습니다.
 
-> 🐳 **Docker는 설치하지 않습니다.** DB를 클라우드(Neon)로 쓰기로 해서 필요가 없어졌습니다. 나중에 로컬 Docker DB로 바꾸고 싶으면 `.env` 한 줄만 고치면 되니, 지금 깔 이유가 없습니다.
+> 🐳 **개발 DB는 로컬 Docker로 띄웁니다.** Docker Desktop(WSL2 백엔드)을 설치하세요.
+>
+> ```powershell
+> winget install Docker.DockerDesktop
+> ```
+>
+> 설치 후 Docker Desktop을 한 번 실행해 두어야 엔진이 켜집니다. 운영 DB(Neon)는 배포 때 만듭니다.
 
 ### 1-2. 코드 받기
 
@@ -101,7 +107,17 @@ npm ci
 
 > ⚠️ `npm install`이 아니라 **`npm ci`** 입니다. `package-lock.json`에 적힌 버전을 그대로 설치해서 팀 전체가 똑같은 환경이 됩니다.
 
-### 1-3. 내 Neon DB 만들기
+### 1-3. 개발 DB 띄우기 (로컬 Docker)
+
+```bash
+docker compose up -d
+```
+
+루트의 `compose.yaml`이 `postgres:17` 컨테이너(`yaksok-db`, 포트 5432)를 띄웁니다. 데이터는 볼륨에 남고, `docker compose down`으로 끄고 `docker compose down -v`로 완전히 초기화합니다. 5432 포트를 이미 쓰고 있다면 `compose.yaml`의 포트를 `"5433:5432"`로 바꾸고 `DATABASE_URL`도 맞추세요.
+
+#### (배포 때) Neon 운영 DB 만들기
+
+> 아래는 **운영 DB를 만들 때** 참고하는 절차입니다. 개발에는 필요 없습니다.
 
 [neon.com](https://neon.com)에 **GitHub 계정으로 가입**합니다.
 
@@ -136,7 +152,13 @@ Windows PowerShell이면:
 Copy-Item .env.example .env
 ```
 
-`.env`를 열어서 `DATABASE_URL`을 **본인 Neon 연결 문자열**로 바꿉니다. 나머지 값은 아직 비워둬도 됩니다.
+`.env`의 `DATABASE_URL`을 로컬 Docker 주소로 바꿉니다. 나머지 값은 아직 비워둬도 됩니다.
+
+```
+DATABASE_URL="postgresql://yaksok:yaksok@localhost:5432/yaksok"
+```
+
+(로컬에는 SSL이 없으므로 `sslmode=require`를 붙이지 않습니다.)
 
 > 🔥 `.env`는 `.gitignore`에 들어 있어 Git에 올라가지 않습니다. **절대 이 설정을 풀지 마세요.** 한 번 커밋되면 히스토리에 영원히 남아서 키를 재발급하는 것 말고는 방법이 없습니다.
 
@@ -148,7 +170,7 @@ npx prisma migrate dev
 npm run dev
 ```
 
-`migrate dev`가 저장소에 있는 마이그레이션 파일들을 **내 Neon DB에 적용**합니다. 비어 있던 DB에 테이블이 생깁니다.
+`migrate dev`가 저장소에 있는 마이그레이션 파일들을 **내 로컬 Docker DB에 적용**합니다. 비어 있던 DB에 테이블이 생깁니다.
 
 ### 1-6. 확인
 
@@ -159,7 +181,7 @@ npm run dev
 | `http://localhost:3000` | Next.js 기본 화면 |
 | `http://localhost:3000/api/health` | `{"ok":true,"userCount":0}` |
 
-> 🎉 `/api/health`에서 `{"ok":true,"userCount":0}`가 나오면 **Next.js → Prisma → 내 Neon DB까지 전부 연결된 것**입니다. 환경 구축 완료입니다.
+> 🎉 `/api/health`에서 `{"ok":true,"userCount":0}`가 나오면 **Next.js → Prisma → 내 로컬 Docker DB까지 전부 연결된 것**입니다. 환경 구축 완료입니다.
 >
 > 안 되면 아래 「자주 터지는 오류」를 먼저 보시고, 그래도 안 되면 **30분 이상 혼자 붙잡지 말고** 이슈 DB에 등록하세요.
 

@@ -9,11 +9,11 @@
 | yaksok (워크스페이스 루트) | https://app.notion.com/p/39f7085f318280cc929be4cdf17b76a6 |
 | 문서 구조 | https://app.notion.com/p/4067085f31828038bc8dcea69375316f |
 
-## 스펙 → `docs/product/`
+## 스펙 → `docs/specs/product/`
 | 문서 | Notion | 변환 |
 | --- | --- | --- |
-| PRD | https://app.notion.com/p/39f7085f318280cf8399fd2b34379762 | `product/PRD.md`, `product/MVP_SCOPE.md` |
-| USER STORY (Backlog) | https://app.notion.com/p/3d37085f318280049b7ae8c6f4b2e6f2 | `product/user-stories/USER_STORIES.md` |
+| PRD | https://app.notion.com/p/39f7085f318280cf8399fd2b34379762 | `specs/product/PRD.md`, `specs/product/MVP_SCOPE.md` |
+| USER STORY (Backlog) | https://app.notion.com/p/3d37085f318280049b7ae8c6f4b2e6f2 | `specs/product/user-stories/USER_STORIES.md` |
 
 ## 설계 → `docs/specs/`, `docs/architecture/`
 | 문서 | Notion | 변환 |
@@ -35,7 +35,7 @@
 | --- | --- | --- |
 | 기술 스택 | https://app.notion.com/p/3db7085f3182802099efd9da83c2d965 | `architecture/TECH_STACK.md` |
 | 환경 설정 | https://app.notion.com/p/3db7085f3182802f9d7bcb4578320e9a | `architecture/SETUP.md` |
-| DOCKER 설정 | https://app.notion.com/p/3db7085f318280ff87b0ce98d2421710 | 무효 (Neon 전환으로 Docker 미사용) |
+| DOCKER 설정 | https://app.notion.com/p/3db7085f318280ff87b0ce98d2421710 | 부분 유효 (개발용 로컬 DB 한정, 앱 컨테이너화·Render 배포는 무효) |
 | 카카오 챗봇 | https://app.notion.com/p/3e97085f3182803abc65ea7dccc9e0d4 | `architecture/TECH_STACK.md` |
 
 ## 미변환 (이번 추출 범위 밖)

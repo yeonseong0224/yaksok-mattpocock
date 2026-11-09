@@ -42,6 +42,7 @@ erDiagram
     promises {
         uuid id PK "약속 내부 ID"
         uuid promise_link_id FK,UK "약속 생성 링크"
+        varchar title "약속 이름"
         integer participant_limit "방장 포함 참여 정원"
         date date_range_start "선택 범위 시작일"
         date date_range_end "선택 범위 종료일"
@@ -103,11 +104,12 @@ erDiagram
 | `id` | 불가 | 약속 내부 UUID. |
 | `promise_link_id` | 불가 | 소속 초대 링크 ID. UNIQUE로 한 링크당 약속 최대 하나를 보장한다. |
 | `participant_limit` | 설정 중 허용 | 방장 포함 활성 참여 정원. 2명 이상 30명 이하이며 탈퇴·제외된 참여자는 정원 집계에서 제외한다. |
+| `title` | 설정 중 허용 | 약속 이름. 1~30자, 앞뒤 공백 제거. 2026-11-09 추가(Figma 와이어프레임 반영, STATE-03-01). |
 | `date_range_start` | 설정 중 허용 | 선택할 수 있는 첫 날짜. 해당 날짜 포함. |
 | `date_range_end` | 설정 중 허용 | 선택할 수 있는 마지막 날짜. 해당 날짜 포함. 응답 마감일과는 다르다. |
 | `daily_start_minute` | 설정 중 허용 | 한국 시각 자정부터 선택 시작 경계까지의 분. 0\~1410의 30분 배수. 예: 09:00은 540. |
 | `daily_end_minute` | 설정 중 허용 | 한국 시각 자정부터 선택 종료 경계까지의 분. 30\~1440의 30분 배수. 1440은 24:00을 뜻한다. |
-| `duration_minutes` | 설정 중 허용 | 약속 전체 길이. 30분 이상의 30분 배수. 예: 90분. |
+| `duration_minutes` | 설정 중 허용 | 약속 전체 길이. 30분 이상의 30분 배수. 예: 90분. MVP에서는 120으로 고정하고, `daily_start_minute`·`daily_end_minute`도 540·1440으로 고정한다(STATE-03-01). 컬럼은 이후 설정 기능을 위해 유지한다. |
 | `voting_deadline_at` | 설정 중 허용 | 응답 수정이 종료되는 절대 시각. 서버 판정 시각이 이 값 이상이면 수정 불가. |
 | `status` | 불가 | draft / collecting / closed / confirmed / cancelled 중 하나. |
 | `confirmed_start_at` | 허용 | 최종 약속 시작 날짜·시각. 확정 전과 재조율 시 NULL. |
@@ -213,7 +215,7 @@ ADD CONSTRAINT ck_participant_cancelled_at
 CHECK ((status = 'cancelled') = (cancelled_at IS NOT NULL));
 ```
 
-| 상태 | 정원·날짜·일일 시간·소요 시간·마감 | confirmed\_start\_at | cancelled\_at |
+| 상태 | 이름·정원·날짜·일일 시간·소요 시간·마감 | confirmed\_start\_at | cancelled\_at |
 | --- | --- | --- | --- |
 | draft | 미설정 값 NULL 허용, 입력된 값은 유효해야 함 | NULL | NULL |
 | collecting | 모두 필수 | NULL | NULL |

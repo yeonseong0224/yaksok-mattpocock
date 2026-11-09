@@ -224,8 +224,8 @@
 
 - **Frontend + Backend :** Next.js (TypeScript, App Router) 풀스택
   - 레포 하나에서 통합 개발, 필요 시 이후 백엔드 분리 검토
-- **Database :** PostgreSQL (로컬은 Docker 컨테이너, 운영은 Render 관리형 Postgres). ORM은 **Prisma**, 실제 시점 컬럼은 `@db.Timestamptz(3)`
-- **Infra :** Docker Compose(로컬) + Render(운영) — Render가 Dockerfile로 이미지 빌드·배포, DB 마이그레이션은 Pre-Deploy Command에서 실행
+- **Database :** PostgreSQL (개발은 로컬 Docker 컨테이너, 운영은 Neon). ORM은 **Prisma**, 실제 시점 컬럼은 `@db.Timestamptz(3)`
+- **Infra :** Vercel(앱 배포) + Neon(운영 DB), 개발 DB는 Docker Compose(로컬). 앱은 컨테이너화하지 않으며, 운영 DB 마이그레이션은 `prisma migrate deploy`로 적용
 - **외부 API :**
   - **카카오 오픈빌더 + 스킬 서버 (MVP)** : 챗봇 시나리오, 초대 링크 발급 요청 처리 (스킬 응답 5초 제한)
   - 네이버지도 API (MVP 이후) : Geocoding, 장소 검색

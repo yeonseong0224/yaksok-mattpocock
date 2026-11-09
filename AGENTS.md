@@ -18,7 +18,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 ## 스택 (임의로 바꾸지 말 것)
 
 - Next.js 16 App Router + TypeScript (웹과 챗봇 API를 한 프로젝트에서)
-- Prisma 7 + @prisma/adapter-pg + PostgreSQL (Neon)
+- Prisma 7 + @prisma/adapter-pg + PostgreSQL (개발: 로컬 Docker / 운영: Neon)
 - Tailwind CSS 4
 
 ## 버전
@@ -37,13 +37,14 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 ## DB와 마이그레이션
 
-- 개발·운영 DB는 별도의 Neon 브랜치 또는 프로젝트로 분리한다.
+- 개발 DB는 각자 로컬 Docker(`compose.yaml`의 postgres)를 쓰고, 운영 DB는 Neon을 쓴다. 둘은 분리한다.
+- Postgres 메이저 버전은 Docker와 Neon 모두 17로 맞춘다.
 - 개발자마다 자기 개발 DB를 사용한다.
 - 개발 DB의 스키마 변경은 `prisma migrate dev`로 마이그레이션 파일을 남긴다.
 - 운영 DB에는 커밋된 마이그레이션을 `prisma migrate deploy`로 적용한다.
 - `db push`는 사용하지 않는다.
 - 리셋은 삭제 가능한 개인 개발 DB에 한해 허용한다.
-- 공유 개발 DB의 리셋은 팀원과 협의하고, 운영 DB는 리셋하지 않는다.
+- 개인 개발 DB(로컬 Docker)는 `docker compose down -v`로 리셋할 수 있고, 운영 DB는 리셋하지 않는다.
 
 ## 비밀값
 
@@ -57,6 +58,10 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - 카카오 스킬 응답은 5초 안에 끝낸다. 오래 걸리는 작업은 분리한다.
 - 약속 관리자 권한과 참여 링크 권한을 분리한다.
   참여 링크만으로 관리자 권한을 얻을 수 없어야 한다.
+
+## 화면 디자인
+
+- 화면을 구현하기 전에 `docs/design/FIGMA.md`에서 해당 프레임을 찾아 Figma MCP로 확인한다. Figma와 스펙이 다르면 스펙을 따른다(차이점은 그 문서에 정리돼 있다).
 
 ## 현재 상태
 

@@ -9,25 +9,25 @@
 1. docs/specs/rules/     비즈니스 규칙   ← 최상위 기준
 2. docs/architecture/DATABASE.md   ERD
 3. docs/specs/api/       API 명세
-4. docs/product/PRD.md   PRD            ← 가장 나중
+4. docs/specs/product/PRD.md   PRD            ← 가장 나중
 ```
 
 PRD는 제품 비전 문서다. 구현 세부가 PRD와 비즈니스 규칙에서 다르면 **비즈니스 규칙이 맞다.**
 
 ## 에이전트가 지켜야 할 3가지
 
-1. **MVP 범위 밖을 구현하지 않는다.** 카카오 로그인, 톡캘린더, 위치·중간지점, 장소 추천·투표는 전부 MVP 이후다. `docs/product/MVP_SCOPE.md` 참고.
+1. **MVP 범위 밖을 구현하지 않는다.** 카카오 로그인, 톡캘린더, 위치·중간지점, 장소 추천·투표는 전부 MVP 이후다. `docs/specs/product/MVP_SCOPE.md` 참고.
 2. **❗미결 표시된 규칙을 임의로 결정하지 않는다.** 구현이 막히면 멈추고 사람에게 묻는다. 현재 전체 규칙 153개 중 **80개가 미결**이다.
 3. **문서 간 불일치를 발견하면 `docs/development/DECISION_CONFLICTS.md`를 먼저 확인한다.** 이미 알려진 충돌이면 거기 적힌 판단을 따르고, 새로운 충돌이면 그 파일에 추가한다.
 
 ## 목차
 
-### product — 무엇을 만드는가
+### specs/product — 무엇을 만드는가
 | 파일 | 내용 |
 | --- | --- |
-| `product/PRD.md` | 제품 요구사항 전문 (2026-10-30 정합화 개정본) |
-| `product/MVP_SCOPE.md` | MVP 범위 안/밖 + 핵심 제약값 |
-| `product/user-stories/USER_STORIES.md` | User Story 32개 (MVP 16 / 후속 16) |
+| `specs/product/PRD.md` | 제품 요구사항 전문 (2026-10-30 정합화 개정본) |
+| `specs/product/MVP_SCOPE.md` | MVP 범위 안/밖 + 핵심 제약값 |
+| `specs/product/user-stories/USER_STORIES.md` | User Story 32개 (MVP 16 / 후속 16) |
 
 ### architecture — 어떻게 만드는가
 | 파일 | 내용 |
