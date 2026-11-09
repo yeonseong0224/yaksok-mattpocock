@@ -14,7 +14,8 @@
   - 요청에 섞인 지난 슬롯은 무시하고, 이미 저장된 지난 슬롯은 보존한다
   - 범위 밖 슬롯은 빼고 저장한다
   - 제출 시각을 기록하고 version을 1 올린다
-- [ ] baseVersion이 다르면 409 `AVAILABILITY_VERSION_CONFLICT`, 슬롯이 5,000개를 넘으면 422 `SLOT_LIMIT_EXCEEDED`
+- [ ] baseVersion이 다르고 내용도 다르면 409 `AVAILABILITY_VERSION_CONFLICT`(최신 버전, 슬롯, 제출 상태 포함). 슬롯이 5,000개를 넘으면 422 `SLOT_LIMIT_EXCEEDED`
+- [ ] baseVersion이 달라도 요청한 슬롯 집합과 제출 상태가 저장된 값과 같으면, 아무것도 바꾸지 않고 버전도 올리지 않으며 200과 최신 버전을 돌려준다(응답 유실 후 재시도, TIME-10-04 예외 · ERD 8.2). 성공 응답에는 항상 최신 버전이 들어 있다
 - [ ] 빈 배열로 제출할 수 있다. 화면에서는 "모두 불가능으로 제출됩니다"라고 확인을 받는다
 - [ ] 마감 판정(ADR-0001)
   - promises 행을 FOR UPDATE로 잠근 뒤 DB 시각으로 판정한다. 그 시각이 마감 시각 이상이면 거부한다
