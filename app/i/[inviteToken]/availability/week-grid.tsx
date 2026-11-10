@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type PointerEvent } from "react";
-import { addDays, kstMidnight } from "@/lib/time";
+import { addDays, kstMidnight, MINUTE_MS } from "@/lib/time";
 import { WEEKDAYS, weekday } from "../calendar";
 
 // 주간 7일 격자(Figma 07·17). 세로는 하루 시간 범위의 30분 슬롯, 가로는 날짜.
@@ -11,9 +11,6 @@ import { WEEKDAYS, weekday } from "../calendar";
 // - 처음 누른 슬롯이 비어 있으면 추가, 선택돼 있으면 해제한다.
 // - 누른 곳과 지금 포인터가 있는 곳을 꼭짓점으로 하는 사각 범위(날짜 × 시간)에 적용한다.
 // - 포인터 캡처를 써서 포인터가 격자 밖으로 나가도 놓는 순간 끝난다. 한 번 누르고 떼면 슬롯 하나만 바뀐다.
-
-// PR #5(후보 계산)가 머지되면 lib/time.ts의 MINUTE_MS로 바꾼다.
-const MINUTE_MS = 60_000;
 
 export type SlotView =
   | { kind: "outside" } // 날짜 범위 밖

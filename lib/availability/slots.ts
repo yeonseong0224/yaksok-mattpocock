@@ -1,13 +1,10 @@
-import { isDateString, kstDate } from "@/lib/time";
+import { isDateString, kstDate, MINUTE_MS, SLOT_MS } from "@/lib/time";
 
 // 가능 시간 슬롯의 형식·범위 판정(TIME-API-01 처리 순서 2·6)
 
 /** 한 번에 받을 수 있는 슬롯 수(중복 정리 전 개수 기준) */
 export const SLOT_LIMIT = 5000;
 
-// PR #5(후보 계산)가 머지되면 lib/time.ts의 SLOT_MS·MINUTE_MS로 바꾼다.
-const MINUTE_MS = 60_000;
-const SLOT_MS = 30 * MINUTE_MS;
 const KST_OFFSET_MS = 9 * 60 * MINUTE_MS;
 const SLOT_ISO = /^(\d{4}-\d{2}-\d{2})T([01]\d|2[0-3]):(00|30):00(\.000)?\+09:00$/;
 
