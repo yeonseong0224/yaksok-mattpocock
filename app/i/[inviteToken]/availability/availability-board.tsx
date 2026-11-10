@@ -108,10 +108,14 @@ export function AvailabilityBoard({
     return slotMs <= serverNow ? { kind: "past", ...view } : { kind: "open", ...view };
   }
 
-  function toggle(slotMs: number) {
+  // 드래그·클릭으로 고른 슬롯들을 한꺼번에 추가하거나 해제한다.
+  function applySelection(slots: number[], add: boolean) {
+    if (slots.length === 0) return;
     const next = new Set(selected);
-    if (next.has(slotMs)) next.delete(slotMs);
-    else next.add(slotMs);
+    for (const slot of slots) {
+      if (add) next.add(slot);
+      else next.delete(slot);
+    }
     setDraft({ slots: next, baseVersion: draft?.baseVersion ?? data!.me.version });
     setConfirmEmpty(false);
     setNotice(null);
@@ -216,7 +220,7 @@ export function AvailabilityBoard({
         <p className="mt-3 text-xs text-muted">
           {tab === "mine"
             ? editable
-              ? "30분 단위 · 칸을 누르면 선택, 다시 누르면 해제. 빗금 칸은 지난 시간이에요."
+              ? "30분 단위 · 빈 칸부터 드래그하면 추가, 선택한 칸부터 드래그하면 해제. 빗금 칸은 지난 시간이에요."
               : "마감되어 수정할 수 없어요."
             : "진할수록 더 많은 사람이 가능해요."}
         </p>
@@ -230,7 +234,7 @@ export function AvailabilityBoard({
             total={data.totalParticipants}
             today={today}
             slotView={slotView}
-            onToggle={editable && tab === "mine" ? toggle : undefined}
+            onSelect={editable && tab === "mine" ? applySelection : undefined}
           />
         </div>
 
