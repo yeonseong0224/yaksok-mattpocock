@@ -1,4 +1,7 @@
 const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
+/** 슬롯 길이: 30분(GLOSSARY 슬롯) */
+export const SLOT_MS = 30 * 60_000;
+export const MINUTE_MS = 60_000;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 /** API 응답용 시각 표기: ISO 8601, 밀리초 3자리, `+09:00`. 예: `2026-10-11T12:10:00.000+09:00` */
