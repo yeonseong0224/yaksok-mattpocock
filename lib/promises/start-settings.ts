@@ -1,5 +1,5 @@
 import { countGraphemes } from "@/lib/text";
-import { addDays, addMinutes, isDateString, kstDate, kstMidnight } from "@/lib/time";
+import { addDays, addMinutes, isDateString, kstDate, kstMidnight, SLOT_MS } from "@/lib/time";
 
 // 모집 시작 설정 검증(STATE-03-01, TIME-03-01·04-01~03·13-01·14-01/02).
 // 판정 시각을 인자로 받는다. 라우트는 잠금 후 DB 시각을 넘기고, 화면은 같은 규칙으로 미리 확인한다.
@@ -17,7 +17,6 @@ export const MVP_DAILY_START_MINUTE = 540;
 export const MVP_DAILY_END_MINUTE = 1440;
 export const MVP_DURATION_MINUTES = 120;
 
-const SLOT_MS = 30 * 60_000;
 const ISO_WITH_OFFSET = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d{1,3})?)?(Z|[+-]\d{2}:\d{2})$/;
 
 export type StartSettingsInput = {
