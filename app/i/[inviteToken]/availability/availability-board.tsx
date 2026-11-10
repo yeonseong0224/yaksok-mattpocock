@@ -17,6 +17,7 @@ import {
 import { weekStartOf } from "../calendar";
 import { ParticipantRoster } from "../participant-home";
 import { DateJumpDialog } from "./date-jump-dialog";
+import { toSortedKstIsos, useLocalDraft } from "./local-draft";
 import { WeekGrid, type SlotView } from "./week-grid";
 
 // 가능 시간 화면(Figma 07·13~17·21). 슬롯을 눌러 내 가능 시간을 고르고 제출한다.
@@ -51,10 +52,11 @@ export function AvailabilityBoard({
   });
   const data = availability.data;
 
-  // null이면 내가 고친 것이 없어 서버에 제출된 값을 그대로 보여준다.
+  // 제출하지 않은 내 선택. null이면 고친 것이 없어 서버에 제출된 값을 그대로 보여준다.
+  // 새로고침해도 남도록 이 브라우저에 저장된 값에서 시작하고, 바뀔 때마다 저장한다(TIME-10-01).
   // 고치기 시작한 시점의 내 버전(baseVersion)을 함께 들고 있어야, 그 사이 다른 기기가 제출한 값을
   // 덮어쓰지 않고 409로 막을 수 있다(TIME-10-04, ERD 8.2). 폴링으로 받은 최신 버전을 보내면 안 된다.
-  const [draft, setDraft] = useState<{ slots: Set<number>; baseVersion: number } | null>(null);
+  const [draft, setDraft] = useLocalDraft(promiseId, me.participantId);
   const [tab, setTab] = useState<"mine" | "heatmap">("mine");
   const [weekStart, setWeekStart] = useState<string | null>(null);
   const [jumpOpen, setJumpOpen] = useState(false);
@@ -89,6 +91,24 @@ export function AvailabilityBoard({
   }
   if (!data) return <p className="text-center text-muted">불러오는 중…</p>;
 
+  // 서버 버전이 기준 버전과 다르면(다른 기기 제출·범위 변경) 이 기기의 입력을 버리고 알린다(TIME-10-04).
+  // 내 제출이 진행 중일 때는 내 제출로 버전이 오른 것이므로 건너뛴다.
+  // 마감되면 더 이상 제출할 수 없으니 버린다. null로 바꾸면 저장된 입력도 지워진다.
+  if (draft !== null && !pending) {
+    const closed = data.status !== "collecting";
+    const stale = draft.baseVersion !== data.me.version;
+    if (closed || stale) {
+      setDraft(null);
+      // 버려진 입력이 최신 제출값과 같으면 화면이 바뀌지 않으니 알릴 것도 없다.
+      if (!closed && !sameSet(draft.slots, toMsSet(data.me.slots))) {
+        setNotice({
+          tone: "error",
+          text: "다른 기기에서 제출했거나 약속 범위가 바뀌어서, 이 기기에서 제출하지 않은 입력은 지우고 최신 내용을 보여드려요.",
+        });
+      }
+    }
+  }
+
   const { settings } = data;
   const serverNow = Date.parse(data.serverTime);
   const today = kstDate(new Date(serverNow));
@@ -116,6 +136,7 @@ export function AvailabilityBoard({
       if (add) next.add(slot);
       else next.delete(slot);
     }
+    // 드래그가 끝날 때마다 바뀐 선택이 이 브라우저에 저장된다(TIME-10-01).
     setDraft({ slots: next, baseVersion: draft?.baseVersion ?? data!.me.version });
     setConfirmEmpty(false);
     setNotice(null);
@@ -130,8 +151,9 @@ export function AvailabilityBoard({
     try {
       const result = await putJson<SubmitResult>(myAvailabilityUrl(promiseId), {
         baseVersion: draft?.baseVersion ?? data!.me.version,
-        slots: [...selected].sort((a, b) => a - b).map((ms) => toKstIso(new Date(ms))),
+        slots: toSortedKstIsos(selected),
       });
+      // 제출에 성공하면 이 브라우저의 임시 입력을 지운다(TIME-10-04).
       setDraft(null);
       await availability.mutate();
       setNotice({
@@ -148,9 +170,25 @@ export function AvailabilityBoard({
           text: "제출하지 못했어요. 선택은 그대로예요. 다시 시도해 주세요.",
         });
       } else if (error.code === "AVAILABILITY_VERSION_CONFLICT") {
-        // 다른 기기에서 먼저 제출했다. 이 기기의 입력을 버리고 최신 값을 보여준다(TIME-10-04).
+        // 다른 기기에서 먼저 제출했다. 이 기기의 입력을 버리고, 응답에 담긴 최신 값으로 바로 다시
+        // 그린다. 다시 조회할 필요가 없다(time.md TIME-API-01, TIME-10-04).
         setDraft(null);
-        await availability.mutate();
+        const latest = error.details as Pick<Availability["me"], "submitted" | "slots"> & {
+          currentVersion: number;
+        };
+        await availability.mutate(
+          (current) =>
+            current && {
+              ...current,
+              me: {
+                ...current.me,
+                version: latest.currentVersion,
+                submitted: latest.submitted,
+                slots: latest.slots,
+              },
+            },
+          { revalidate: false },
+        );
         setNotice({
           tone: "error",
           text: "다른 기기에서 먼저 저장했어요. 최신 내용을 확인해 주세요.",
@@ -220,7 +258,7 @@ export function AvailabilityBoard({
         <p className="mt-3 text-xs text-muted">
           {tab === "mine"
             ? editable
-              ? "30분 단위 · 빈 칸부터 드래그하면 추가, 선택한 칸부터 드래그하면 해제. 빗금 칸은 지난 시간이에요."
+              ? "30분 단위 · 빈 칸부터 드래그하면 추가, 선택한 칸부터 드래그하면 해제. 날짜나 오전·오후·저녁을 누르면 한 번에 고르거나 풀어요. 빗금 칸은 지난 시간이에요."
               : "마감되어 수정할 수 없어요."
             : "진할수록 더 많은 사람이 가능해요."}
         </p>

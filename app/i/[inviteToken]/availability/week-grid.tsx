@@ -18,6 +18,19 @@ export type SlotView =
   | { kind: "open"; selected: boolean; count: number };
 
 type Point = { day: number; row: number };
+
+/**
+ * 큰 시간 블록(TIME-09-02, 2026-11-10 결정): 날짜마다 오전·오후·저녁.
+ * 하루 시간 범위 밖의 슬롯은 블록에 넣지 않는다.
+ */
+const DAY_BLOCKS = [
+  { name: "오전", from: 0, to: 12 * 60 },
+  { name: "오후", from: 12 * 60, to: 18 * 60 },
+  { name: "저녁", from: 18 * 60, to: 24 * 60 },
+] as const;
+
+/** 고를 수 있는 슬롯 중 선택된 정도. 일부 선택은 전체 선택과 다르게 보인다(TIME-09-03). */
+type Coverage = "none" | "partial" | "full" | "unavailable";
 type Drag = { anchor: Point; current: Point; add: boolean };
 
 export function WeekGrid({
@@ -73,6 +86,37 @@ export function WeekGrid({
     setDrag(null);
   }
 
+  /** 그날 rows 안의 고를 수 있는(지나지 않은, 범위 안) 슬롯과 그 선택 정도 */
+  function openSlotsOf(day: number, rows: number[]) {
+    const slots: number[] = [];
+    let selected = 0;
+    for (const row of rows) {
+      const view = viewAt({ day, row });
+      if (view.kind !== "open") continue;
+      slots.push(slotAt({ day, row }));
+      if (view.selected) selected++;
+    }
+    const coverage: Coverage =
+      slots.length === 0
+        ? "unavailable"
+        : selected === 0
+          ? "none"
+          : selected === slots.length
+            ? "full"
+            : "partial";
+    return { slots, coverage };
+  }
+
+  /** 날짜·블록을 누르면: 일부만 또는 하나도 선택돼 있지 않으면 전체 선택, 전체 선택돼 있으면 전체 해제(TIME-09-04) */
+  function toggleGroup(day: number, rows: number[]) {
+    const { slots, coverage } = openSlotsOf(day, rows);
+    if (slots.length > 0) onSelect?.(slots, coverage !== "full");
+  }
+
+  const allRows = minutes.map((_, row) => row);
+  const rowsIn = (from: number, to: number) =>
+    allRows.filter((row) => minutes[row] >= from && minutes[row] < to);
+
   function pointFrom(target: EventTarget | null): Point | null {
     const el =
       target instanceof Element ? target.closest<HTMLElement>("[data-day][data-row]") : null;
@@ -115,17 +159,53 @@ export function WeekGrid({
         <div className="flex items-end border-b border-line px-2 pb-1 text-[11px] text-muted">
           KST
         </div>
-        {days.map((date) => (
-          <div
-            key={date}
-            role="columnheader"
-            className={`border-b border-l border-line py-2 text-center text-sm ${
-              date === today ? "bg-brand/10 font-medium text-brand-ink" : ""
-            }`}
-          >
-            {WEEKDAYS[weekday(date)]} {Number(date.slice(8, 10))}
-          </div>
-        ))}
+        {days.map((date, day) => {
+          const heading = `${WEEKDAYS[weekday(date)]} ${Number(date.slice(8, 10))}`;
+          if (!selectable) {
+            return (
+              <div
+                key={date}
+                role="columnheader"
+                className={`border-b border-l border-line py-2 text-center text-sm ${
+                  date === today ? "bg-brand/10 font-medium text-brand-ink" : ""
+                }`}
+              >
+                {heading}
+              </div>
+            );
+          }
+          // 날짜를 누르면 그날 전체, 블록을 누르면 그 블록만(TIME-09-01·09-02).
+          const whole = openSlotsOf(day, allRows).coverage;
+          return (
+            <div key={date} role="columnheader" className="border-b border-l border-line p-1">
+              <GroupButton
+                coverage={whole}
+                label={`${date} 하루 전체`}
+                onClick={() => toggleGroup(day, allRows)}
+                className={`h-8 w-full text-sm ${date === today && whole === "none" ? "font-medium text-brand-ink" : ""}`}
+              >
+                {heading}
+              </GroupButton>
+              <div className="mt-1 grid grid-cols-3 gap-0.5">
+                {DAY_BLOCKS.map((block) => {
+                  const rows = rowsIn(block.from, block.to);
+                  if (rows.length === 0) return <span key={block.name} />;
+                  return (
+                    <GroupButton
+                      key={block.name}
+                      coverage={openSlotsOf(day, rows).coverage}
+                      label={`${date} ${block.name}`}
+                      onClick={() => toggleGroup(day, rows)}
+                      className="h-6 text-[11px]"
+                    >
+                      {block.name}
+                    </GroupButton>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
 
         {minutes.map((minute, row) => (
           <div key={minute} role="row" className="contents">
@@ -164,6 +244,46 @@ export function WeekGrid({
         ))}
       </div>
     </div>
+  );
+}
+
+function GroupButton({
+  coverage,
+  label: groupLabel,
+  onClick,
+  className,
+  children,
+}: {
+  coverage: Coverage;
+  label: string;
+  onClick: () => void;
+  className: string;
+  children: React.ReactNode;
+}) {
+  const look =
+    coverage === "full"
+      ? "bg-brand text-white hover:bg-brand-strong"
+      : coverage === "partial"
+        ? "bg-brand/20 text-brand-ink hover:bg-brand/30"
+        : coverage === "none"
+          ? "hover:bg-brand/10"
+          : "text-muted/50";
+  const state = {
+    full: "전체 선택됨",
+    partial: "일부 선택됨",
+    none: "선택 안 됨",
+    unavailable: "고를 수 없음",
+  }[coverage];
+  return (
+    <button
+      type="button"
+      disabled={coverage === "unavailable"}
+      onClick={onClick}
+      aria-label={`${groupLabel} ${state}`}
+      className={`rounded-md disabled:cursor-not-allowed ${look} ${className}`}
+    >
+      {children}
+    </button>
   );
 }
 

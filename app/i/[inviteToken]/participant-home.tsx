@@ -4,6 +4,7 @@ import { useState } from "react";
 import useSWR from "swr";
 import { Button } from "@/app/_components/ui";
 import { deleteRequest, getJson, participantsUrl, sessionUrl, type Me, type Roster } from "./api";
+import { clearLocalDraft } from "./availability/local-draft";
 
 // 참여자 명단(닉네임, 방장 표시)과 로그아웃(MEMBER-API-06·07). 제출 여부는 보여주지 않는다(MEMBER-08-02).
 export function ParticipantRoster({
@@ -28,6 +29,8 @@ export function ParticipantRoster({
     try {
       // 이 기기의 로그인만 끝난다. 참여와 입력은 그대로 남는다.
       await deleteRequest(sessionUrl(promiseId));
+      // 로그아웃하면 이 기기의 제출하지 않은 입력도 지운다(스토리 32, TIME-10-04).
+      clearLocalDraft(promiseId, me.participantId);
       onLoggedOut();
     } catch {
       setFailed(true);
