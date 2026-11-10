@@ -549,6 +549,8 @@ if (!response.ok) {
 
 `POST /api/v1/promises/{promiseId}/close`
 
+> **2026-11-10 결정 (티켓 08 구현)**: ERD에 closedAt이 없어서, 조기 마감하면 `voting_deadline_at`을 실제 마감 처리 시각으로 바꾼다. 그래서 세션 만료와 마감 뒤 다시 로그인한 세션의 기준이 모두 "실제 마감 처리 시각 + 7일"이 된다(MEMBER-06-03). 마감 시각이 이미 지난 collecting이면 마감 시각은 그대로 두고 상태만 closed로 바꾼다.
+
 현재 방장이 수집을 마감한다. 이미 closed인 중복 요청은 데이터를 다시 바꾸지 않고 현재 상태를 반환한다.
 
 ### 0. 규칙 연결
@@ -570,7 +572,6 @@ if (!response.ok) {
 - **HTTP Method:** POST
 - **Endpoint:** `/api/v1/promises/{promiseId}/close`
 - **Authentication Required:** 예 — 약속별 세션 쿠키
-  > **2026-11-09 (첫 슬라이스 스펙, 티켓 03 구현)**: 세션이 없거나 이 약속의 active 참여자가 아니면 401 대신 `200 { promiseId, promiseStatus }`(상태만)를 돌려준다. 다른 약속의 세션 쿠키는 Path가 달라 전달되지 않으므로, "다른 약속 소속"도 이 경우에 포함된다(쓰기 API에서는 401).
 - **Content Type:** application/json; charset=utf-8
 - 성공 응답은 기존 MEMBER와 같은 래퍼 없는 JSON이다. 필드·URI·조회 페이지 크기 등 기술 계약은 아래와 같이 정하며 새로운 제품 정책을 추가하지 않는다.
 
@@ -700,7 +701,6 @@ if (!response.ok) {
 - **HTTP Method:** POST
 - **Endpoint:** `/api/v1/promises/{promiseId}/confirmation`
 - **Authentication Required:** 예 — 약속별 세션 쿠키
-  > **2026-11-09 (첫 슬라이스 스펙, 티켓 03 구현)**: 세션이 없거나 이 약속의 active 참여자가 아니면 401 대신 `200 { promiseId, promiseStatus }`(상태만)를 돌려준다. 다른 약속의 세션 쿠키는 Path가 달라 전달되지 않으므로, "다른 약속 소속"도 이 경우에 포함된다(쓰기 API에서는 401).
 - **Content Type:** application/json; charset=utf-8
 - 성공 응답은 기존 MEMBER와 같은 래퍼 없는 JSON이다. 필드·URI·조회 페이지 크기 등 기술 계약은 아래와 같이 정하며 새로운 제품 정책을 추가하지 않는다.
 
@@ -1173,6 +1173,8 @@ closed·confirmed 약속을 collecting으로 다시 열고 새 마감과 선택 
 
 `GET /api/v1/promises/{promiseId}/candidates`
 
+> **2026-11-10 결정 (첫 슬라이스 스펙, 티켓 08 구현)**: 아래 원안과 다르게 구현한다. (1) 모집 중(collecting)에도 현재 제출값 기준의 후보를 돌려준다(RESULT-09-01). (2) 후보마다 참석 가능한 참여자의 닉네임을 `participants[]`로 돌려준다(RESULT-10-01). (3) 서로 겹치지 않는 최대 5개만 계산하므로(RESULT-07-02) `limit`·`offset`·`total`·`hasMore`·`nextOffset`은 없다. 로그인한 active 참여자만 볼 수 있다.
+
 마감된 약속의 전체 범위에서 미래 유효 후보를 공통 가능 인원·시작 시각 순으로 조회한다.
 
 ### 0. 규칙 연결
@@ -1194,7 +1196,6 @@ closed·confirmed 약속을 collecting으로 다시 열고 새 마감과 선택 
 - **HTTP Method:** GET
 - **Endpoint:** `/api/v1/promises/{promiseId}/candidates`
 - **Authentication Required:** 예 — 약속별 세션 쿠키
-  > **2026-11-09 (첫 슬라이스 스펙, 티켓 03 구현)**: 세션이 없거나 이 약속의 active 참여자가 아니면 401 대신 `200 { promiseId, promiseStatus }`(상태만)를 돌려준다. 다른 약속의 세션 쿠키는 Path가 달라 전달되지 않으므로, "다른 약속 소속"도 이 경우에 포함된다(쓰기 API에서는 401).
 - **Content Type:** application/json; charset=utf-8
 - 성공 응답은 기존 MEMBER와 같은 래퍼 없는 JSON이다. 필드·URI·조회 페이지 크기 등 기술 계약은 아래와 같이 정하며 새로운 제품 정책을 추가하지 않는다.
 

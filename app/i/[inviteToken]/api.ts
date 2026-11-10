@@ -2,7 +2,7 @@
 
 export type LinkInfo = {
   inviteToken: string;
-  promiseStatus: "unclaimed" | "draft" | "collecting" | "closed" | "confirmed" | "cancelled";
+  promiseStatus: "unclaimed" | "draft" | OpenPromiseStatus | "cancelled";
   promiseId: string | null;
   nextAction: string;
   pollAfterMs: number | null;
@@ -100,8 +100,11 @@ export const meUrl = (promiseId: string) => `${promiseUrl(promiseId)}/me`;
 export const participantsUrl = (promiseId: string) => `${promiseUrl(promiseId)}/participants`;
 export const sessionUrl = (promiseId: string) => `${promiseUrl(promiseId)}/auth/session`;
 
+/** 참여자가 시간표·후보를 볼 수 있는 약속 상태(마감 계산 반영) */
+export type OpenPromiseStatus = "collecting" | "closed" | "confirmed";
+
 export type Availability = {
-  status: "collecting" | "closed" | "confirmed";
+  status: OpenPromiseStatus;
   serverTime: string;
   settings: {
     dateRangeStart: string;
@@ -141,3 +144,18 @@ export async function putJson<T>(url: string, body: unknown): Promise<T> {
 
 export const availabilityUrl = (promiseId: string) => `${promiseUrl(promiseId)}/availability`;
 export const myAvailabilityUrl = (promiseId: string) => `${promiseUrl(promiseId)}/me/availability`;
+
+export type CandidateList = {
+  promiseId: string;
+  promiseStatus: OpenPromiseStatus;
+  calculatedAt: string;
+  candidates: {
+    startAt: string;
+    endAt: string;
+    availableParticipantCount: number;
+    participants: { participantId: string; nickname: string }[];
+  }[];
+};
+
+export const candidatesUrl = (promiseId: string) => `${promiseUrl(promiseId)}/candidates`;
+export const closeUrl = (promiseId: string) => `${promiseUrl(promiseId)}/close`;

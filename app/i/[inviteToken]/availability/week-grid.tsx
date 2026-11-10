@@ -42,6 +42,7 @@ export function WeekGrid({
   today,
   slotView,
   onSelect,
+  onInspect,
 }: {
   /** 그 주 일요일(YYYY-MM-DD) */
   weekStart: string;
@@ -54,6 +55,8 @@ export function WeekGrid({
   slotView: (slotMs: number, date: string) => SlotView;
   /** 슬롯들을 한꺼번에 추가(add=true)하거나 해제한다. 없으면 읽기 전용이다. */
   onSelect?: (slots: number[], add: boolean) => void;
+  /** 히트맵에서 슬롯을 누르면 그 시간의 상세(누가 가능한지)를 연다. */
+  onInspect?: (slotMs: number) => void;
 }) {
   const [drag, setDrag] = useState<Drag | null>(null);
   const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
@@ -232,6 +235,7 @@ export function WeekGrid({
                   total={total}
                   label={`${date} ${label(minute)}`}
                   topBorder={minute % 60 === 0}
+                  onInspect={onInspect ? () => onInspect(slotAt(point)) : undefined}
                   onKeyboardToggle={
                     selectable && view.kind === "open"
                       ? () => onSelect!([slotAt(point)], !view.selected)
@@ -295,6 +299,7 @@ function SlotCell({
   total,
   label: slotLabel,
   topBorder,
+  onInspect,
   onKeyboardToggle,
 }: {
   day: number;
@@ -304,6 +309,7 @@ function SlotCell({
   total: number;
   label: string;
   topBorder: boolean;
+  onInspect?: () => void;
   /** 키보드(Enter·Space)로 슬롯 하나를 바꾼다. 마우스·터치는 격자의 드래그가 처리한다. */
   onKeyboardToggle?: () => void;
 }) {
@@ -324,9 +330,12 @@ function SlotCell({
   if (mode === "heatmap") {
     const ratio = total > 0 ? view.count / total : 0;
     return (
-      <div
+      <button
+        type="button"
         role="gridcell"
-        className={`flex h-7 items-center justify-center text-[11px] ${border} ${past ? "opacity-50" : ""}`}
+        disabled={!onInspect}
+        onClick={onInspect}
+        className={`flex h-7 items-center justify-center text-[11px] hover:outline hover:outline-brand/40 ${border} ${past ? "opacity-50" : ""}`}
         style={{
           backgroundColor: view.count > 0 ? `rgb(63 99 217 / ${0.15 + ratio * 0.75})` : undefined,
           color: ratio > 0.5 ? "white" : undefined,
@@ -335,7 +344,7 @@ function SlotCell({
         {...position}
       >
         {view.count > 0 && `${view.count}/${total}명`}
-      </div>
+      </button>
     );
   }
 

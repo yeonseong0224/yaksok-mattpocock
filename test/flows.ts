@@ -171,3 +171,22 @@ export async function getAvailability(client: TestClient, promiseId: string) {
     params: { promiseId },
   });
 }
+
+// --- 마감과 후보(티켓 08) ---
+
+export async function closePromise(client: TestClient, promiseId: string) {
+  const { POST } = await import("@/app/api/v1/promises/[promiseId]/close/route");
+  return client.request(POST, {
+    method: "POST",
+    path: `/api/v1/promises/${promiseId}/close`,
+    params: { promiseId },
+  });
+}
+
+export async function getCandidates(client: TestClient, promiseId: string) {
+  const { GET } = await import("@/app/api/v1/promises/[promiseId]/candidates/route");
+  return client.request(GET, {
+    path: `/api/v1/promises/${promiseId}/candidates`,
+    params: { promiseId },
+  });
+}

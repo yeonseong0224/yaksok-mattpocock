@@ -8,7 +8,9 @@ import {
   ApiError,
   availabilityUrl,
   getJson,
+  closeUrl,
   myAvailabilityUrl,
+  postJson,
   putJson,
   type Availability,
   type Me,
@@ -16,8 +18,10 @@ import {
 } from "../api";
 import { weekStartOf } from "../calendar";
 import { ParticipantRoster } from "../participant-home";
+import { CandidateListPanel } from "./candidate-list";
 import { DateJumpDialog } from "./date-jump-dialog";
 import { toSortedKstIsos, useLocalDraft } from "./local-draft";
+import { TimeDetailDialog } from "./time-detail-dialog";
 import { WeekGrid, type SlotView } from "./week-grid";
 
 // 가능 시간 화면(Figma 07·13~17·21). 슬롯을 눌러 내 가능 시간을 고르고 제출한다.
@@ -63,6 +67,11 @@ export function AvailabilityBoard({
   const [confirmEmpty, setConfirmEmpty] = useState(false);
   const [pending, setPending] = useState(false);
   const [notice, setNotice] = useState<Notice>(null);
+  const [inspecting, setInspecting] = useState<number | null>(null);
+  // 후보는 모집 중에도 실시간으로 보이고(RESULT-09-01, 스토리 59), 마감 즉시 최종 후보가 보인다(RESULT-09-02).
+  const [candidatesOpen, setCandidatesOpen] = useState(true);
+  const [confirmClose, setConfirmClose] = useState(false);
+  const [closing, setClosing] = useState(false);
 
   const serverSlots = useMemo(() => toMsSet(data?.me.slots ?? []), [data?.me.slots]);
   const counts = useMemo(() => {
@@ -204,6 +213,27 @@ export function AvailabilityBoard({
     }
   }
 
+  // 조기 마감(STATE-API-04). 방장에게, 모집 중일 때만 보인다.
+  async function closeEarly() {
+    if (!confirmClose) return setConfirmClose(true);
+    setConfirmClose(false);
+    setClosing(true);
+    try {
+      await postJson(closeUrl(promiseId));
+      setCandidatesOpen(true);
+      await availability.mutate();
+    } catch (error) {
+      setNotice({
+        tone: "error",
+        text: error instanceof ApiError ? error.message : "마감하지 못했어요. 다시 시도해 주세요.",
+      });
+    } finally {
+      setClosing(false);
+    }
+  }
+
+  const isHost = me.role === "host";
+  const showCandidates = candidatesOpen;
   const deadline = toKstIso(new Date(settings.votingDeadlineAt));
   const monthDay = (d: string) => d.slice(5).replace("-", ".");
   const maxCount = Math.max(0, ...counts.values());
@@ -260,7 +290,7 @@ export function AvailabilityBoard({
             ? editable
               ? "30분 단위 · 빈 칸부터 드래그하면 추가, 선택한 칸부터 드래그하면 해제. 날짜나 오전·오후·저녁을 누르면 한 번에 고르거나 풀어요. 빗금 칸은 지난 시간이에요."
               : "마감되어 수정할 수 없어요."
-            : "진할수록 더 많은 사람이 가능해요."}
+            : "진할수록 더 많은 사람이 가능해요. 칸을 누르면 누가 가능한지 보여요."}
         </p>
 
         <div className="mt-3">
@@ -273,6 +303,7 @@ export function AvailabilityBoard({
             today={today}
             slotView={slotView}
             onSelect={editable && tab === "mine" ? applySelection : undefined}
+            onInspect={tab === "heatmap" ? setInspecting : undefined}
           />
         </div>
 
@@ -292,17 +323,53 @@ export function AvailabilityBoard({
               </>
             )}
           </div>
-          {editable && tab === "mine" && (
-            <div className="flex items-center gap-2">
-              {confirmEmpty && (
-                <span className="text-sm text-danger">모두 불가능으로 제출됩니다. 계속할까요?</span>
-              )}
+          <div className="flex flex-wrap items-center gap-2">
+            {confirmEmpty && (
+              <span className="text-sm text-danger">모두 불가능으로 제출됩니다. 계속할까요?</span>
+            )}
+            {confirmClose && (
+              <span className="text-sm text-danger">
+                {dirty
+                  ? "제출하지 않은 내 변경은 사라지고, 아무도 시간을 고칠 수 없어요. 마감할까요?"
+                  : "마감하면 아무도 시간을 고칠 수 없어요. 마감할까요?"}
+              </span>
+            )}
+            <Button
+              variant="secondary"
+              onClick={() => setCandidatesOpen(!showCandidates)}
+              aria-expanded={showCandidates}
+              className="sm:w-32"
+            >
+              {showCandidates ? "후보 닫기" : "후보 보기"}
+            </Button>
+            {/* 모집 중에는 "일정 확정하기" 자리에 방장용 "조기 마감"(STATE-07-01, Figma와 다른 점) */}
+            {editable && isHost && (
+              <Button
+                variant="secondary"
+                onClick={closeEarly}
+                disabled={closing}
+                className="sm:w-32"
+              >
+                {closing ? "마감하는 중…" : confirmClose ? "마감하기" : "조기 마감"}
+              </Button>
+            )}
+            {editable && tab === "mine" && (
               <Button onClick={submit} disabled={pending} className="sm:w-48">
                 {pending ? "제출하는 중…" : confirmEmpty ? "그래도 제출" : "가능 시간 제출"}
               </Button>
-            </div>
-          )}
+            )}
+          </div>
         </BottomBar>
+        {showCandidates && (
+          <CandidateListPanel
+            promiseId={promiseId}
+            pollMs={POLL_MS}
+            onPick={(date) => {
+              setWeekStart(weekStartOf(date));
+              setTab("heatmap");
+            }}
+          />
+        )}
         {notice && (
           <p
             role={notice.tone === "error" ? "alert" : "status"}
@@ -318,6 +385,13 @@ export function AvailabilityBoard({
         )}
       </section>
 
+      {inspecting !== null && (
+        <TimeDetailDialog
+          slotMs={inspecting}
+          participants={data.participants}
+          onClose={() => setInspecting(null)}
+        />
+      )}
       {jumpOpen && (
         <DateJumpDialog
           initialMonth={`${shownWeek.slice(0, 7)}-01`}
