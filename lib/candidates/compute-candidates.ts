@@ -116,3 +116,24 @@ function selectableWindows(settings: CandidateSettings): Window[] {
   }
   return windows;
 }
+
+/**
+ * 확정된 시간 [startMs, startMs + 약속 길이)에 연속으로 가능한 참여자(입력 순서).
+ * 확정 당시 목록은 저장하지 않고 현재 제출값으로 다시 계산한다. 2명 미만이 돼도 그대로 돌려준다(RESULT-13-02).
+ */
+export function attendeesFor({
+  startMs,
+  durationMinutes,
+  respondents,
+}: {
+  startMs: number;
+  durationMinutes: number;
+  respondents: Respondent[];
+}): string[] {
+  const durationMs = durationMinutes * MINUTE_MS;
+  return respondents
+    .filter((r) =>
+      coversWholeMeeting(new Set(r.slotStarts.map((d) => d.getTime())), startMs, durationMs),
+    )
+    .map((r) => r.participantId);
+}

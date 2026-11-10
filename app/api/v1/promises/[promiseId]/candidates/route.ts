@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@/prisma/generated/client";
 import { invalidRequest, noStore } from "@/lib/api/responses";
-import { loadCandidates } from "@/lib/candidates/load-candidates";
+import { scheduledTimeJson, loadCandidates } from "@/lib/candidates/load-candidates";
 import { authenticate, setSessionCookie } from "@/lib/members/session";
 import {
   invalidPromiseState,
@@ -48,12 +48,7 @@ export async function GET(
     promiseId,
     promiseStatus: effectiveStatus(promise),
     calculatedAt: toKstIso(promise.now),
-    candidates: candidates.map((c) => ({
-      startAt: toKstIso(c.startAt),
-      endAt: toKstIso(c.endAt),
-      availableParticipantCount: c.participants.length,
-      participants: c.participants,
-    })),
+    candidates: candidates.map(scheduledTimeJson),
   });
   setSessionCookie(response, viewer.cookie);
   return noStore(response);

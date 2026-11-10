@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { SLOT_MS } from "@/lib/time";
-import { computeCandidates, type CandidateSettings, type Respondent } from "./compute-candidates";
+import {
+  attendeesFor,
+  computeCandidates,
+  type CandidateSettings,
+  type Respondent,
+} from "./compute-candidates";
 
 // 후보 계산(RESULT-01~07, TIME-05-02·07-01·08-02). 보조 seam: DB·시계 없이 입력만으로 검증한다.
 
@@ -298,5 +303,33 @@ describe("후보 계산", () => {
     });
 
     expect(result[0].participantIds).toEqual(["a", "b"]);
+  });
+});
+
+describe("확정된 시간의 참석 가능한 참여자", () => {
+  const start = kst("2026-12-01T14:00").getTime();
+
+  it("약속 길이 전체에 연속으로 가능한 참여자만 돌려준다", () => {
+    const ids = attendeesFor({
+      startMs: start,
+      durationMinutes: 60,
+      respondents: [
+        respondent("a", ["12-01 14:00", "12-01 15:00"]),
+        respondent("b", ["12-01 14:00", "12-01 14:30"]),
+        respondent("c", ["12-01 13:00", "12-01 16:00"]),
+      ],
+    });
+
+    expect(ids).toEqual(["a", "c"]);
+  });
+
+  it("가능한 사람이 2명 미만이어도 그대로 돌려준다(확정은 유지된다, RESULT-13-02)", () => {
+    const ids = attendeesFor({
+      startMs: start,
+      durationMinutes: 60,
+      respondents: [respondent("a", ["12-01 14:00", "12-01 15:00"])],
+    });
+
+    expect(ids).toEqual(["a"]);
   });
 });

@@ -26,6 +26,7 @@ export type PromiseView =
       draftExpiresAt: string | null;
       draftExpired: boolean;
       settings: PromiseSettings;
+      currentConfirmation: Confirmation | null;
     };
 
 export class ApiError extends Error {
@@ -149,13 +150,23 @@ export type CandidateList = {
   promiseId: string;
   promiseStatus: OpenPromiseStatus;
   calculatedAt: string;
-  candidates: {
-    startAt: string;
-    endAt: string;
-    availableParticipantCount: number;
-    participants: { participantId: string; nickname: string }[];
-  }[];
+  candidates: ScheduledTime[];
 };
 
 export const candidatesUrl = (promiseId: string) => `${promiseUrl(promiseId)}/candidates`;
 export const closeUrl = (promiseId: string) => `${promiseUrl(promiseId)}/close`;
+
+/** 후보·확정 일정 하나(시작·끝, 참석 가능한 사람) */
+export type ScheduledTime = {
+  startAt: string;
+  endAt: string;
+  availableParticipantCount: number;
+  participants: { participantId: string; nickname: string }[];
+};
+
+export type Confirmation = ScheduledTime & {
+  /** 방장이 보고 있고 참석 가능 인원이 2명 미만이면 true */
+  hostActionRequired: boolean;
+};
+
+export const confirmationUrl = (promiseId: string) => `${promiseUrl(promiseId)}/confirmation`;
