@@ -72,3 +72,30 @@ export async function postJson<T>(url: string, body?: unknown): Promise<T> {
 
 export const linkUrl = (inviteToken: string) => `/api/v1/links/${encodeURIComponent(inviteToken)}`;
 export const promiseUrl = (promiseId: string) => `/api/v1/promises/${promiseId}`;
+
+export type Me = {
+  participantId: string;
+  nickname: string;
+  role: "host" | "member";
+  promiseStatus: LinkInfo["promiseStatus"];
+};
+
+export type Roster = {
+  participantLimit: number | null;
+  currentParticipantCount: number;
+  participants: {
+    participantId: string;
+    nickname: string;
+    role: "host" | "member";
+    isMe: boolean;
+  }[];
+};
+
+export async function deleteRequest(url: string): Promise<void> {
+  const res = await fetch(url, { method: "DELETE" });
+  if (!res.ok && res.status !== 401) throw await toApiError(res);
+}
+
+export const meUrl = (promiseId: string) => `${promiseUrl(promiseId)}/me`;
+export const participantsUrl = (promiseId: string) => `${promiseUrl(promiseId)}/participants`;
+export const sessionUrl = (promiseId: string) => `${promiseUrl(promiseId)}/auth/session`;

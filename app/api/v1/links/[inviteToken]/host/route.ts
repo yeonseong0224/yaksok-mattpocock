@@ -2,15 +2,14 @@ import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@/prisma/generated/client";
 import { rejectForeignOrigin } from "@/lib/api/origin";
-import { apiError, invalidRequest, readJsonObject } from "@/lib/api/responses";
+import { apiError, readJsonObject } from "@/lib/api/responses";
 import { linkExpired, linkNotFound } from "@/lib/links/errors";
 import { lockLink } from "@/lib/links/link-state";
 import { deleteDraft, DRAFT_TTL_MINUTES } from "@/lib/promises/promise-state";
-import { normalizeNickname } from "@/lib/members/nickname";
+import { parseCredentials } from "@/lib/members/credentials";
 import { hashPin } from "@/lib/members/pin";
-import { isValidPin } from "@/lib/members/pin-format";
 import {
-  DRAFT_SESSION_SECONDS,
+  draftSessionExpiresAt,
   issueSession,
   setSessionCookie,
   type SessionCookie,
@@ -37,20 +36,11 @@ export async function POST(
   if (forbidden) return forbidden;
 
   const { inviteToken } = await context.params;
-  const body = await readJsonObject(request);
-  if (!body || typeof body.nickname !== "string" || typeof body.pin !== "string") {
-    return invalidRequest();
-  }
-  const normalized = normalizeNickname(body.nickname);
-  if (!normalized.ok) {
-    return apiError(422, "VALIDATION_FAILED", normalized.message, { field: "nickname" });
-  }
-  const { nickname } = normalized;
-  if (!isValidPin(body.pin)) {
-    return apiError(422, "VALIDATION_FAILED", "PIN은 숫자 4자리여야 합니다.", { field: "pin" });
-  }
+  const parsed = parseCredentials(await readJsonObject(request));
+  if (!parsed.ok) return parsed.response;
+  const { nickname, pin } = parsed.credentials;
   // 해시는 잠금을 잡기 전에 계산해 잠금 유지 시간을 줄인다.
-  const passwordHash = await hashPin(body.pin);
+  const passwordHash = await hashPin(pin);
 
   let outcome: Outcome;
   try {
@@ -80,7 +70,7 @@ export async function POST(
         kind: "created",
         participantId: host.id,
         draftExpiresAt: addMinutes(promise.createdAt, DRAFT_TTL_MINUTES),
-        session: await issueSession(tx, host, link.now, DRAFT_SESSION_SECONDS),
+        session: await issueSession(tx, host, link.now, draftSessionExpiresAt(link.now)),
       };
     });
   } catch (error) {

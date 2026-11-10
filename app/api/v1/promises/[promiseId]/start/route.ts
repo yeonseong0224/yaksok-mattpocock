@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { rejectForeignOrigin } from "@/lib/api/origin";
 import { apiError, invalidRequest, noStore, readJsonObject } from "@/lib/api/responses";
 import {
-  AFTER_DEADLINE_SESSION_DAYS,
+  afterDeadlineExpiresAt,
   authenticate,
   extendActiveSessions,
   sessionCookieUntil,
@@ -32,7 +32,6 @@ import {
   validateStartSettings,
   type SettingsError,
 } from "@/lib/promises/start-settings";
-import { addMinutes } from "@/lib/time";
 
 type Outcome =
   | { kind: "not_found" }
@@ -97,10 +96,7 @@ export async function POST(
       },
     });
     // 모든 세션을 마감 + 7일까지 늘린다(MEMBER-06-03).
-    const sessionExpiresAt = addMinutes(
-      settings.votingDeadlineAt,
-      AFTER_DEADLINE_SESSION_DAYS * 24 * 60,
-    );
+    const sessionExpiresAt = afterDeadlineExpiresAt(settings.votingDeadlineAt);
     await extendActiveSessions(tx, promiseId, promise.now, sessionExpiresAt);
 
     const updated = await findPromise(tx, promiseId);

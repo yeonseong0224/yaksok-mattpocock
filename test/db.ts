@@ -43,3 +43,19 @@ export async function insertMemberSession(promiseId: string, nickname = "민수"
   });
   return token;
 }
+
+/** 약속의 모든 세션을 이미 만료된 것으로 만든다(마감 + 7일이 지난 상황 재현). */
+export async function expireSessions(promiseId: string) {
+  await prisma.$executeRaw`
+    UPDATE participant_sessions s SET expires_at = now() - interval '1 minute'
+    FROM participants p
+    WHERE p.id = s.participant_id AND p.promise_id = ${promiseId}::uuid`;
+}
+
+/** 참여자를 탈퇴(cancelled) 상태로 만든다. 탈퇴 API가 생기기 전 준비 단계용이다. */
+export async function cancelParticipant(promiseId: string, nickname: string) {
+  await prisma.participant.update({
+    where: { promiseId_normalizedNickname: { promiseId, normalizedNickname: nickname } },
+    data: { status: "cancelled", cancelledAt: new Date() },
+  });
+}

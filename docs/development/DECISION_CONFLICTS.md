@@ -77,6 +77,7 @@
 | C-07 | **cancelled 참여자 응답 코드** | MEMBER-API-04 "403 `PARTICIPANT_CANCELLED`" / 공통 규약 §3 "401 `UNAUTHENTICATED`" | 하나로 통일 |
 | C-08 | **버전 충돌 에러 코드** | TIME API 명세 `AVAILABILITY_VERSION_CONFLICT` / 참고 페이지 `SUBMISSION_CONFLICT` | 후자가 구 명칭 |
 | C-09 | **지난 슬롯 처리** | ERD 5.2절 / TIME API 문서에 "ERD 5.2절 첫 문장 수정 필요"로 기록됨 | ERD 수정 대상 |
+| C-10 | **취소된 약속의 응답 코드** | STATE-API-00 "모든 일반 STATE API는 `409 PROMISE_CANCELLED`" / MEMBER-API-04·06 "409 `INVALID_PROMISE_STATE`" | **2026-11-10 구현 결정(티켓 04): 모든 약속 경로 API에서 `409 PROMISE_CANCELLED`로 통일.** 클라이언트가 취소 안내를 한 코드로 판별할 수 있게 하기 위해서다. MEMBER-API 문서 수정 대상 |
 
 ---
 
