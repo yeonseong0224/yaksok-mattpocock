@@ -145,3 +145,29 @@ export async function createCollectingPromise(
   expect(started.status).toBe(200);
   return created;
 }
+
+// --- 가능 시간(티켓 06) ---
+
+/** 모집 시작 본문(validStartBody)의 시작일로부터 dayOffset일 뒤 KST hh:mm 슬롯의 ISO 문자열 */
+export function slotAt(dayOffset: number, hhmm: string): string {
+  const startDate = addDays(addDays(kstDate(new Date()), 2), dayOffset);
+  return `${startDate}T${hhmm}:00+09:00`;
+}
+
+export async function submitAvailability(client: TestClient, promiseId: string, body: unknown) {
+  const { PUT } = await import("@/app/api/v1/promises/[promiseId]/me/availability/route");
+  return client.request(PUT, {
+    method: "PUT",
+    path: `/api/v1/promises/${promiseId}/me/availability`,
+    params: { promiseId },
+    body,
+  });
+}
+
+export async function getAvailability(client: TestClient, promiseId: string) {
+  const { GET } = await import("@/app/api/v1/promises/[promiseId]/availability/route");
+  return client.request(GET, {
+    path: `/api/v1/promises/${promiseId}/availability`,
+    params: { promiseId },
+  });
+}

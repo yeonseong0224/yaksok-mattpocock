@@ -10,10 +10,13 @@ export function ParticipantRoster({
   promiseId,
   me,
   onLoggedOut,
+  compact = false,
 }: {
   promiseId: string;
   me: Me;
   onLoggedOut: () => void;
+  /** 가능 시간 화면의 옆 자리처럼 좁은 곳에 넣을 때 */
+  compact?: boolean;
 }) {
   const roster = useSWR<Roster>(participantsUrl(promiseId), getJson);
   const [pending, setPending] = useState(false);
@@ -34,7 +37,9 @@ export function ParticipantRoster({
   }
 
   return (
-    <section className="mx-auto mt-6 max-w-lg rounded-2xl border border-line bg-surface p-6 sm:p-7">
+    <section
+      className={`rounded-2xl border border-line bg-surface ${compact ? "p-4" : "mx-auto mt-6 max-w-lg p-6 sm:p-7"}`}
+    >
       <div className="flex items-baseline justify-between">
         <h2 className="text-lg font-bold">참여자</h2>
         {roster.data && (

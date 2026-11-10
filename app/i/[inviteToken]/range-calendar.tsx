@@ -1,14 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { addDays } from "@/lib/time";
+import { monthCells, monthLabel, shiftMonth, WEEKDAYS } from "./calendar";
 
 // 월간 달력에서 시작일·종료일을 클릭해 날짜 범위를 고른다(Figma 01·02, TIME-04-01~03).
 // 첫 클릭은 시작일, 두 번째 클릭은 종료일. 고를 수 없는 날짜는 비활성으로 보인다.
 
 export type DateRange = { startDate: string | null; endDate: string | null };
-
-const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
 
 export function RangeCalendar({
   value,
@@ -55,7 +53,7 @@ export function RangeCalendar({
           ‹
         </MonthButton>
         <p className="text-lg font-bold" aria-live="polite">
-          {Number(month.slice(0, 4))}년 {Number(month.slice(5, 7))}월
+          {monthLabel(month)}
         </p>
         <MonthButton label="다음 달" onClick={() => setMonth(shiftMonth(month, 1))}>
           ›
@@ -145,21 +143,4 @@ function toneOf(date: string, { startDate, endDate }: DateRange): Tone {
   if (date === startDate || date === endDate) return "edge";
   if (startDate && endDate && date > startDate && date < endDate) return "inside";
   return "none";
-}
-
-/** 그 달의 날짜 칸. 1일 앞의 빈칸은 null. */
-function monthCells(month: string): (string | null)[] {
-  const first = new Date(`${month}T00:00:00Z`);
-  const blanks = first.getUTCDay();
-  const cells: (string | null)[] = Array.from({ length: blanks }, () => null);
-  for (let date = month; date.slice(0, 7) === month.slice(0, 7); date = addDays(date, 1)) {
-    cells.push(date);
-  }
-  return cells;
-}
-
-function shiftMonth(month: string, delta: number): string {
-  const d = new Date(`${month}T00:00:00Z`);
-  d.setUTCMonth(d.getUTCMonth() + delta);
-  return d.toISOString().slice(0, 10);
 }

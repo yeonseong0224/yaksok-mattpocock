@@ -59,3 +59,20 @@ export async function cancelParticipant(promiseId: string, nickname: string) {
     data: { status: "cancelled", cancelledAt: new Date() },
   });
 }
+
+/** 참여자의 저장된 슬롯 하나를 지난 시각(어제 같은 시각)으로 옮긴다(지난 슬롯 보존 재현). */
+export async function moveSlotToPast(slotStartAt: string) {
+  await prisma.$executeRaw`
+    UPDATE participant_available_slots
+    SET slot_start_at = date_trunc('hour', now()) - interval '1 day'
+    WHERE slot_start_at = ${new Date(slotStartAt)}`;
+}
+
+/**
+ * 약속의 DB 상태(promises.status). 조회 API는 마감을 계산만 하므로(ADR-0001),
+ * "마감 뒤 첫 쓰기 요청이 DB를 closed로 바꾼다"는 요구는 DB에서만 확인할 수 있다.
+ */
+export async function storedPromiseStatus(promiseId: string): Promise<string> {
+  const row = await prisma.promise.findUniqueOrThrow({ where: { id: promiseId } });
+  return row.status;
+}

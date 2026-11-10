@@ -9,9 +9,11 @@ import type { PromiseSettings } from "./api";
 export function InviteLink({
   inviteToken,
   settings,
+  onOpenAvailability,
 }: {
   inviteToken: string;
   settings: PromiseSettings;
+  onOpenAvailability: () => void;
 }) {
   // 서버 렌더에서는 origin을 모르므로 브라우저에서만 읽는다.
   const origin = useSyncExternalStore(
@@ -66,10 +68,7 @@ export function InviteLink({
         <Button variant="secondary" onClick={copy}>
           초대 링크 복사
         </Button>
-        {/* 시간 투표 화면은 티켓 06에서 연결한다. */}
-        <Button disabled title="시간 입력 화면을 준비하고 있어요">
-          내 가능 시간 입력하기
-        </Button>
+        <Button onClick={onOpenAvailability}>내 가능 시간 입력하기</Button>
       </div>
 
       {toast && (
