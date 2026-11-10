@@ -19,6 +19,7 @@ import { InviteLink } from "./invite-link";
 import { JoinPanel } from "./join-panel";
 import { ParticipantRoster } from "./participant-home";
 import { SettingsForm } from "./settings-form";
+import { AvailabilityBoard } from "./availability/availability-board";
 
 // 초대 링크 진입 페이지. 링크 상태(MEMBER-API-01)를 보고, promiseId가 생기면 /me로 본인 여부를 확인해
 // 화면을 고른다(API_CONVENTIONS 5.1 본인 복원 2단계). 설정은 참여자에게만 내려온다(STATE-API-01).
@@ -37,6 +38,8 @@ export function LinkEntry({ inviteToken }: { inviteToken: string }) {
     getJson,
   );
   const [expiredByClock, setExpiredByClock] = useState(false);
+  // 방장이 모집을 시작한 직후에는 초대 링크 화면(Figma 04)을 먼저 보여준다.
+  const [showInvite, setShowInvite] = useState(false);
 
   // 등록·로그인·로그아웃 뒤에는 화면에 쓰는 데이터를 모두 비우고 다시 받는다(이전 사람의 정보가 남지 않게).
   const { mutate } = useSWRConfig();
@@ -87,7 +90,10 @@ export function LinkEntry({ inviteToken }: { inviteToken: string }) {
       <SettingsForm
         promiseId={promiseId}
         draftExpiresAt={draft.draftExpiresAt!}
-        onStarted={refresh}
+        onStarted={() => {
+          setShowInvite(true);
+          return refresh();
+        }}
         onExpired={expire}
       />
     );
@@ -104,24 +110,31 @@ export function LinkEntry({ inviteToken }: { inviteToken: string }) {
     );
   }
 
-  const roster = <ParticipantRoster promiseId={promiseId} me={viewer} onLoggedOut={refresh} />;
-  if (status === "collecting" && promise.data?.settings) {
+  const settings = promise.data?.settings;
+  if (!settings) return <LoadFailed />;
+  if (showInvite) {
     return (
       <>
-        <InviteLink inviteToken={inviteToken} settings={promise.data.settings} />
-        {roster}
+        <InviteLink
+          inviteToken={inviteToken}
+          settings={settings}
+          onOpenAvailability={() => setShowInvite(false)}
+        />
+        <ParticipantRoster promiseId={promiseId} me={viewer} onLoggedOut={refresh} />
       </>
     );
   }
-  // 마감·확정 결과 화면은 티켓 08·09에서 이 자리에 들어온다.
+  // 모집 중에는 가능 시간 입력, 마감 뒤에는 같은 화면을 읽기 전용으로 보여준다.
+  // 후보·확정 결과(티켓 08·09)가 이 화면에 더해진다.
   return (
-    <>
-      <Card>
-        <CardTitle>투표가 마감됐어요</CardTitle>
-        <CardText>결과 화면을 준비하고 있어요.</CardText>
-      </Card>
-      {roster}
-    </>
+    <AvailabilityBoard
+      promiseId={promiseId}
+      title={settings.title ?? ""}
+      me={viewer}
+      onShowInvite={() => setShowInvite(true)}
+      onLoggedOut={refresh}
+      onSessionLost={refresh}
+    />
   );
 }
 

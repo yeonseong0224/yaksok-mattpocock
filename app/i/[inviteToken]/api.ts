@@ -99,3 +99,45 @@ export async function deleteRequest(url: string): Promise<void> {
 export const meUrl = (promiseId: string) => `${promiseUrl(promiseId)}/me`;
 export const participantsUrl = (promiseId: string) => `${promiseUrl(promiseId)}/participants`;
 export const sessionUrl = (promiseId: string) => `${promiseUrl(promiseId)}/auth/session`;
+
+export type Availability = {
+  status: "collecting" | "closed" | "confirmed";
+  serverTime: string;
+  settings: {
+    dateRangeStart: string;
+    dateRangeEnd: string;
+    dailyStartTime: string;
+    dailyEndTime: string;
+    durationMinutes: number;
+    votingDeadlineAt: string;
+  };
+  totalParticipants: number;
+  participants: {
+    participantId: string;
+    nickname: string;
+    isHost: boolean;
+    availableSlots: string[];
+  }[];
+  me: { participantId: string; version: number; submitted: boolean; slots: string[] };
+};
+
+export type SubmitResult = {
+  version: number;
+  submitted: true;
+  submittedAt: string;
+  slots: string[];
+  droppedSlotCount: number;
+};
+
+export async function putJson<T>(url: string, body: unknown): Promise<T> {
+  const res = await fetch(url, {
+    method: "PUT",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw await toApiError(res);
+  return (await res.json()) as T;
+}
+
+export const availabilityUrl = (promiseId: string) => `${promiseUrl(promiseId)}/availability`;
+export const myAvailabilityUrl = (promiseId: string) => `${promiseUrl(promiseId)}/me/availability`;

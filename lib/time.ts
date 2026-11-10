@@ -41,3 +41,8 @@ export function minuteToHhmm(minute: number): string {
   const mm = String(minute % 60).padStart(2, "0");
   return `${hh}:${mm}`;
 }
+
+/** "HH:mm"을 하루 시작부터의 분으로. "24:00"은 1440이다(minuteToHhmm의 반대). */
+export function hhmmToMinute(hhmm: string): number {
+  return Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(3, 5));
+}

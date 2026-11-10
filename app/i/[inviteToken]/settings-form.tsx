@@ -198,7 +198,7 @@ export function SettingsForm({
             </div>
           </Labeled>
 
-          <Labeled id="deadline-date" label="③ 투표 마감 · KST" error={errors.votingDeadlineAt}>
+          <Labeled id="deadline-date" label="③ 응답 마감 · KST" error={errors.votingDeadlineAt}>
             <div className="flex gap-2">
               <input
                 id="deadline-date"
