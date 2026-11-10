@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Button } from "@/app/_components/ui";
 import { monthCells, monthLabel, shiftMonth, WEEKDAYS } from "../calendar";
+import { useCloseOnEscape } from "../use-close-on-escape";
 
 // 이동할 날짜 선택 팝업(Figma 13~15). 날짜를 누르면 그 주로 이동한다. 회색 날짜는 입력 범위 밖이다.
 export function DateJumpDialog({
@@ -19,6 +20,7 @@ export function DateJumpDialog({
   onClose: () => void;
 }) {
   const [month, setMonth] = useState(initialMonth);
+  useCloseOnEscape(onClose);
 
   return (
     <div
