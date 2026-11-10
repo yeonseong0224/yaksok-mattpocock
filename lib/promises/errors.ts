@@ -12,3 +12,6 @@ export const invalidPromiseState = (promiseStatus: string, allowedStates: string
     promiseStatus,
     allowedStates,
   });
+export const promiseNotOpen = () =>
+  apiError(409, "PROMISE_NOT_OPEN", "방장이 약속을 설정 중입니다.");
+export const deadlinePassed = () => apiError(409, "DEADLINE_PASSED", "응답 마감이 지났습니다.");

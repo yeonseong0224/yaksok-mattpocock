@@ -77,3 +77,71 @@ export function startCollecting(
     body,
   });
 }
+
+// --- 참여자(티켓 04) ---
+
+const promiseParams = (promiseId: string) => ({ promiseId });
+
+export async function registerParticipant(
+  client: TestClient,
+  promiseId: string,
+  body: unknown = { nickname: "혜승", pin: "1357" },
+) {
+  const { POST } = await import("@/app/api/v1/promises/[promiseId]/participants/route");
+  return client.request(POST, {
+    method: "POST",
+    path: `/api/v1/promises/${promiseId}/participants`,
+    params: promiseParams(promiseId),
+    body,
+  });
+}
+
+export async function getRoster(client: TestClient, promiseId: string) {
+  const { GET } = await import("@/app/api/v1/promises/[promiseId]/participants/route");
+  return client.request(GET, {
+    path: `/api/v1/promises/${promiseId}/participants`,
+    params: promiseParams(promiseId),
+  });
+}
+
+export async function logIn(
+  client: TestClient,
+  promiseId: string,
+  body: unknown = { nickname: "혜승", pin: "1357" },
+) {
+  const { POST } = await import("@/app/api/v1/promises/[promiseId]/auth/session/route");
+  return client.request(POST, {
+    method: "POST",
+    path: `/api/v1/promises/${promiseId}/auth/session`,
+    params: promiseParams(promiseId),
+    body,
+  });
+}
+
+export async function logOut(client: TestClient, promiseId: string) {
+  const { DELETE } = await import("@/app/api/v1/promises/[promiseId]/auth/session/route");
+  return client.request(DELETE, {
+    method: "DELETE",
+    path: `/api/v1/promises/${promiseId}/auth/session`,
+    params: promiseParams(promiseId),
+  });
+}
+
+export async function getMe(client: TestClient, promiseId: string) {
+  const { GET } = await import("@/app/api/v1/promises/[promiseId]/me/route");
+  return client.request(GET, {
+    path: `/api/v1/promises/${promiseId}/me`,
+    params: promiseParams(promiseId),
+  });
+}
+
+/** 방장이 모집을 시작한 약속을 만든다. 방장 클라이언트에 방장 세션이 남는다. */
+export async function createCollectingPromise(
+  host: TestClient,
+  startOverrides: Record<string, unknown> = {},
+) {
+  const created = await createDraftPromise(host);
+  const started = await startCollecting(host, created.promiseId, validStartBody(startOverrides));
+  expect(started.status).toBe(200);
+  return created;
+}

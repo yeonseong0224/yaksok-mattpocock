@@ -2,36 +2,58 @@
 
 import Link from "next/link";
 import { useCallback, useState } from "react";
-import useSWR from "swr";
+import useSWR, { useSWRConfig } from "swr";
 import { buttonClass, Button, Card, CardText, CardTitle } from "@/app/_components/ui";
-import { ApiError, getJson, linkUrl, promiseUrl, type LinkInfo, type PromiseView } from "./api";
+import {
+  ApiError,
+  getJson,
+  linkUrl,
+  meUrl,
+  promiseUrl,
+  type LinkInfo,
+  type Me,
+  type PromiseView,
+} from "./api";
 import { HostRegistrationForm } from "./host-registration-form";
 import { InviteLink } from "./invite-link";
+import { JoinPanel } from "./join-panel";
+import { ParticipantRoster } from "./participant-home";
 import { SettingsForm } from "./settings-form";
 
-// 초대 링크 진입 페이지. 링크 상태(MEMBER-API-01)와, 세션이 있으면 약속 설정(STATE-API-01)을 보고 화면을 고른다.
-// 설정 중(draft) 화면은 링크를 주기적으로 다시 조회해 모집 시작이나 초안 만료를 감지한다(MEMBER-03-02).
+// 초대 링크 진입 페이지. 링크 상태(MEMBER-API-01)를 보고, promiseId가 생기면 /me로 본인 여부를 확인해
+// 화면을 고른다(API_CONVENTIONS 5.1 본인 복원 2단계). 설정은 참여자에게만 내려온다(STATE-API-01).
 export function LinkEntry({ inviteToken }: { inviteToken: string }) {
   const link = useSWR<LinkInfo, ApiError>(linkUrl(inviteToken), getJson);
   const promiseId = link.data?.promiseId ?? null;
-  const promise = useSWR<PromiseView, ApiError>(promiseId ? promiseUrl(promiseId) : null, getJson);
+  // 로그인하지 않았으면 /me는 401이다. 오류가 곧 "참여자가 아님"이므로 재시도하지 않는다.
+  const me = useSWR<Me, ApiError>(promiseId ? meUrl(promiseId) : null, getJson, {
+    shouldRetryOnError: false,
+  });
+  const viewer = me.error ? null : (me.data ?? null);
+  // 401은 "참여자가 아님"이다. 그 밖의 오류(서버·네트워크)는 로그인한 사람에게 참여 폼을 보이지 않게 따로 다룬다.
+  const meFailed = me.error !== undefined && me.error.status !== 401;
+  const promise = useSWR<PromiseView, ApiError>(
+    promiseId && viewer ? promiseUrl(promiseId) : null,
+    getJson,
+  );
   const [expiredByClock, setExpiredByClock] = useState(false);
 
-  const viewer = promise.data?.settings ? promise.data : null;
-  const { mutate: reloadLink } = link;
-  const { mutate: reloadPromise } = promise;
+  // 등록·로그인·로그아웃 뒤에는 화면에 쓰는 데이터를 모두 비우고 다시 받는다(이전 사람의 정보가 남지 않게).
+  const { mutate } = useSWRConfig();
   const refresh = useCallback(async () => {
     setExpiredByClock(false);
-    await reloadLink();
-    await reloadPromise();
-  }, [reloadLink, reloadPromise]);
+    await mutate(() => true, undefined, { revalidate: true });
+  }, [mutate]);
   const expire = useCallback(() => setExpiredByClock(true), []);
 
   if (link.error) {
     if (link.error.status === 404 || link.error.status === 410) return <InvalidLink />;
     return <LoadFailed />;
   }
-  if (!link.data || (promiseId && !promise.data && !promise.error)) {
+  if (meFailed) return <LoadFailed />;
+  const meSettled = !promiseId || me.data !== undefined || me.error !== undefined;
+  const promiseSettled = !viewer || promise.data !== undefined || promise.error !== undefined;
+  if (!link.data || !meSettled || !promiseSettled) {
     return <p className="text-center text-muted">불러오는 중…</p>;
   }
 
@@ -42,26 +64,9 @@ export function LinkEntry({ inviteToken }: { inviteToken: string }) {
         inviteToken={inviteToken}
         onRegistered={refresh}
         onHostTaken={refresh}
-        onInvalidLink={() => reloadLink()}
+        onInvalidLink={refresh}
       />
     );
-  }
-
-  if (status === "draft") {
-    if (!viewer || !promiseId) return <WaitSetup inviteToken={inviteToken} />;
-    if (viewer.draftExpired || expiredByClock) return <DraftExpired onRestart={refresh} />;
-    return (
-      <SettingsForm
-        promiseId={promiseId}
-        draftExpiresAt={viewer.draftExpiresAt!}
-        onStarted={refresh}
-        onExpired={expire}
-      />
-    );
-  }
-
-  if (status === "collecting" && viewer) {
-    return <InviteLink inviteToken={inviteToken} settings={viewer.settings} />;
   }
   if (status === "cancelled") {
     return (
@@ -71,24 +76,93 @@ export function LinkEntry({ inviteToken }: { inviteToken: string }) {
       </Card>
     );
   }
-  // 참여자 등록(티켓 04)과 결과 화면(티켓 08)이 이 자리에 들어온다.
+  if (!promiseId) return <LoadFailed />;
+
+  if (status === "draft") {
+    const draft = promise.data?.settings ? promise.data : null;
+    if (!viewer || !draft)
+      return <WaitSetup inviteToken={inviteToken} promiseId={promiseId} onJoined={refresh} />;
+    if (draft.draftExpired || expiredByClock) return <DraftExpired onRestart={refresh} />;
+    return (
+      <SettingsForm
+        promiseId={promiseId}
+        draftExpiresAt={draft.draftExpiresAt!}
+        onStarted={refresh}
+        onExpired={expire}
+      />
+    );
+  }
+
+  if (!viewer) {
+    return (
+      <JoinPanel
+        promiseId={promiseId}
+        canRegister={status === "collecting"}
+        onJoined={refresh}
+        onPromiseChanged={refresh}
+      />
+    );
+  }
+
+  const roster = <ParticipantRoster promiseId={promiseId} me={viewer} onLoggedOut={refresh} />;
+  if (status === "collecting" && promise.data?.settings) {
+    return (
+      <>
+        <InviteLink inviteToken={inviteToken} settings={promise.data.settings} />
+        {roster}
+      </>
+    );
+  }
+  // 마감·확정 결과 화면은 티켓 08·09에서 이 자리에 들어온다.
   return (
-    <Card>
-      <CardTitle>약속에 참여하기</CardTitle>
-      <CardText>참여자 등록 화면을 준비하고 있어요.</CardText>
-    </Card>
+    <>
+      <Card>
+        <CardTitle>투표가 마감됐어요</CardTitle>
+        <CardText>결과 화면을 준비하고 있어요.</CardText>
+      </Card>
+      {roster}
+    </>
   );
 }
 
 // 설정 중 화면만 링크를 주기적으로 다시 조회한다(pollAfterMs, MEMBER-03-02). 같은 SWR 키라 위의 화면 선택도 함께 갱신된다.
-function WaitSetup({ inviteToken }: { inviteToken: string }) {
+// 다른 기기에서 들어온 방장은 여기서 로그인해 설정을 이어 갈 수 있다.
+function WaitSetup({
+  inviteToken,
+  promiseId,
+  onJoined,
+}: {
+  inviteToken: string;
+  promiseId: string;
+  onJoined: () => void;
+}) {
   useSWR<LinkInfo, ApiError>(linkUrl(inviteToken), getJson, {
     refreshInterval: (data) => data?.pollAfterMs ?? 3000,
   });
+  const [hostLogin, setHostLogin] = useState(false);
+
+  if (hostLogin) {
+    return (
+      <JoinPanel
+        promiseId={promiseId}
+        canRegister={false}
+        onJoined={onJoined}
+        onPromiseChanged={onJoined}
+        hostLogin
+      />
+    );
+  }
   return (
     <Card>
       <CardTitle>방장이 약속을 설정 중입니다</CardTitle>
       <CardText>설정이 끝나면 이 화면이 저절로 바뀌어요. 새로고침하지 않아도 돼요.</CardText>
+      <button
+        type="button"
+        onClick={() => setHostLogin(true)}
+        className="mt-5 text-sm text-brand-ink underline"
+      >
+        제가 방장이에요 · 로그인
+      </button>
     </Card>
   );
 }

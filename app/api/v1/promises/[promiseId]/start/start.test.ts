@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { POST as start } from "./route";
-import { createTestClient } from "@/test/http";
+import { cookieMaxAge, createTestClient } from "@/test/http";
 import { ageDraft, insertMemberSession, passDeadline } from "@/test/db";
 import {
   createDraftPromise,
@@ -14,11 +14,6 @@ import {
 // STATE-API-02 설정 완료와 모집 시작
 
 const DAY_SECONDS = 24 * 60 * 60;
-
-function maxAgeOf(setCookie: string[]): number {
-  const match = setCookie.join("\n").match(/Max-Age=(\d+)/);
-  return match ? Number(match[1]) : NaN;
-}
 
 describe("모집 시작", () => {
   it("방장이 설정을 마치면 약속이 모집 중(collecting)이 되고 링크로 참여할 수 있다", async () => {
@@ -56,12 +51,12 @@ describe("모집 시작", () => {
     const res = await startCollecting(host, promiseId, body);
 
     const expected = (Date.parse(body.votingDeadlineAt) - Date.now()) / 1000 + 7 * DAY_SECONDS;
-    const maxAge = maxAgeOf(res.headers.getSetCookie());
+    const maxAge = cookieMaxAge(res);
     expect(maxAge).toBeGreaterThan(expected - 60);
     expect(maxAge).toBeLessThanOrEqual(expected + 1);
     // 이후 응답도 늘어난 만료를 쿠키에 싣는다.
     const later = await getPromise(host, promiseId);
-    expect(maxAgeOf(later.headers.getSetCookie())).toBeGreaterThan(expected - 60);
+    expect(cookieMaxAge(later)).toBeGreaterThan(expected - 60);
   });
 
   it("어긋난 설정은 422로 거부하고 필드별 이유를 모두 알려준다", async () => {

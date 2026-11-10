@@ -169,3 +169,13 @@ function pathMatches(requestPath: string, cookiePath: string): boolean {
 }
 
 export type TestClient = ReturnType<typeof createTestClient>;
+
+/** 응답이 내려준 쿠키의 Max-Age(초). 없으면 NaN. */
+export function cookieMaxAge(res: TestResponse): number {
+  return Number(
+    res.headers
+      .getSetCookie()
+      .join()
+      .match(/Max-Age=(\d+)/)?.[1],
+  );
+}
