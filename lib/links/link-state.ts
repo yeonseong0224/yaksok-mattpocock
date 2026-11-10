@@ -1,7 +1,6 @@
 import type { Prisma } from "@/prisma/generated/client";
-import { prisma } from "@/lib/prisma";
-
-type Db = Prisma.TransactionClient | typeof prisma;
+import type { Db } from "@/lib/prisma";
+import { DRAFT_TTL_MINUTES } from "@/lib/promises/promise-state";
 
 export type LinkRow = {
   linkId: string;
@@ -9,6 +8,10 @@ export type LinkRow = {
   expired: boolean;
   promiseId: string | null;
   promiseStatus: string | null;
+  /** 연결된 약속이 생성 후 10분이 지난 draft인가(STATE-02-02) */
+  draftExpired: boolean;
+  /** 연결된 약속이 collecting이고 마감 시각이 지났는가(ADR-0001) */
+  deadlinePassed: boolean;
   /** 판정에 쓴 DB 시각(clock_timestamp) */
   now: Date;
 };
@@ -18,6 +21,8 @@ type RawLinkRow = {
   expired: boolean;
   promise_id: string | null;
   promise_status: string | null;
+  draft_expired: boolean;
+  deadline_passed: boolean;
   now: Date;
 };
 
@@ -27,6 +32,11 @@ export async function findLink(db: Db, inviteToken: string): Promise<LinkRow | n
     SELECT l.id AS link_id,
            l.created_at + interval '3 months' < clock_timestamp() AS expired,
            p.id AS promise_id, p.status AS promise_status,
+           COALESCE(p.status = 'draft'
+             AND p.created_at + make_interval(mins => ${DRAFT_TTL_MINUTES}) <= clock_timestamp(),
+             false) AS draft_expired,
+           COALESCE(p.status = 'collecting' AND p.voting_deadline_at <= clock_timestamp(),
+             false) AS deadline_passed,
            clock_timestamp() AS now
     FROM promise_links l
     LEFT JOIN promises p ON p.promise_link_id = l.id
@@ -38,6 +48,8 @@ export async function findLink(db: Db, inviteToken: string): Promise<LinkRow | n
     expired: row.expired,
     promiseId: row.promise_id,
     promiseStatus: row.promise_status,
+    draftExpired: row.draft_expired,
+    deadlinePassed: row.deadline_passed,
     now: row.now,
   };
 }
