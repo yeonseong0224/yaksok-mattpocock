@@ -75,7 +75,7 @@ export function RepeatDialog({
       role="dialog"
       aria-modal="true"
       aria-labelledby="repeat-title"
-      className="fixed inset-0 z-20 flex items-center justify-center overflow-y-auto bg-ink/30 px-4 py-6"
+      className="fixed inset-0 z-20 flex items-start justify-center overflow-y-auto bg-ink/30 px-4 py-6 sm:items-center"
       onClick={onClose}
     >
       <div

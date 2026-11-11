@@ -29,8 +29,9 @@ import { DateJumpDialog } from "./date-jump-dialog";
 import { toSortedKstIsos, useLocalDraft } from "./local-draft";
 import { RepeatDialog } from "./repeat-dialog";
 import { RepeatMenu, type RepeatMode } from "./repeat-menu";
+import { RepeatSheet, type RepeatSource } from "./repeat-sheet";
 import { TimeDetailDialog } from "./time-detail-dialog";
-import { WeekGrid, type SlotView } from "./week-grid";
+import { WeekGrid, type RepeatTrigger, type SlotView, type TouchMode } from "./week-grid";
 
 // 가능 시간 화면(Figma 07·13~17·21). 슬롯을 눌러 내 가능 시간을 고르고 제출한다.
 // 제출하기 전의 선택은 이 화면에만 있고, 다른 사람과 집계에는 제출한 값만 보인다(TIME-10-04).
@@ -44,7 +45,14 @@ const sameSet = (a: Set<number>, b: Set<number>) =>
 
 type Notice = { tone: "info" | "error"; text: string } | null;
 /** 반복 메뉴·팝업의 원본 날짜. origin은 닫을 때 포커스를 돌려줄 요소다. */
-type RepeatSource = { date: string; origin: HTMLElement };
+type RepeatOrigin = { date: string; origin: HTMLElement };
+/**
+ * 반복 메뉴를 연 방법. mouse(우클릭)는 그 자리의 팝업 메뉴, touch(길게 누르기)와 button(모바일 "반복 사용")은
+ * 바텀시트로 연다. button은 원본 날짜가 없어 시트에서 먼저 고른다.
+ */
+type RepeatOpen =
+  | (RepeatOrigin & { trigger: RepeatTrigger; x: number; y: number })
+  | { trigger: "button"; origin: HTMLElement };
 
 export function AvailabilityBoard({
   promiseId,
@@ -87,10 +95,10 @@ export function AvailabilityBoard({
   const [closing, setClosing] = useState(false);
   const [confirming, setConfirming] = useState<ScheduledTime | null>(null);
   // 우클릭 반복 메뉴(Figma 09)와 반복 팝업(Figma 10·11)
-  const [repeatMenu, setRepeatMenu] = useState<(RepeatSource & { x: number; y: number }) | null>(
-    null,
-  );
-  const [repeating, setRepeating] = useState<(RepeatSource & { mode: RepeatMode }) | null>(null);
+  const [repeatMenu, setRepeatMenu] = useState<RepeatOpen | null>(null);
+  const [repeating, setRepeating] = useState<(RepeatOrigin & { mode: RepeatMode }) | null>(null);
+  // 모바일 터치 조작(Figma 23): 선택 모드는 드래그로 슬롯 선택, 스크롤 모드는 화면 이동
+  const [touchMode, setTouchMode] = useState<TouchMode>("select");
   // 후보 목록과 같은 키라 한 번만 조회된다. 확정 버튼을 보여줄 슬롯(표시 후보의 시작)을 알기 위해 쓴다.
   const candidates = useSWR<CandidateList, ApiError>(candidatesUrl(promiseId), getJson, {
     refreshInterval: POLL_MS,
@@ -287,6 +295,7 @@ export function AvailabilityBoard({
   const deadline = toKstIso(new Date(settings.votingDeadlineAt));
   const monthDay = (d: string) => d.slice(5).replace("-", ".");
   const maxCount = Math.max(0, ...counts.values());
+  const submitLabel = pending ? "제출하는 중…" : confirmEmpty ? "그래도 제출" : "가능 시간 제출";
 
   return (
     <div className="grid gap-6 lg:grid-cols-[240px_1fr]">
@@ -335,12 +344,38 @@ export function AvailabilityBoard({
             </Tab>
           </div>
         </div>
+        {editable && tab === "mine" && (
+          // 터치 기기에서만 보인다(화면 폭이 아니라 포인터 종류 기준이라 태블릿에도 보인다).
+          <div className="mt-3 hidden grid-cols-2 gap-1 rounded-lg bg-canvas p-1 pointer-coarse:grid">
+            <Tab active={touchMode === "select"} onClick={() => setTouchMode("select")} tall>
+              선택 모드
+            </Tab>
+            <Tab active={touchMode === "scroll"} onClick={() => setTouchMode("scroll")} tall>
+              스크롤 모드
+            </Tab>
+          </div>
+        )}
         <p className="mt-3 text-xs text-muted">
-          {tab === "mine"
-            ? editable
-              ? "30분 단위 · 빈 칸부터 드래그하면 추가, 선택한 칸부터 드래그하면 해제. 날짜나 오전·오후·저녁을 누르면 한 번에 고르거나 풀어요. 빗금 칸은 지난 시간이에요."
-              : "마감되어 수정할 수 없어요."
-            : "진할수록 더 많은 사람이 가능해요. 칸을 누르면 누가 가능한지 보여요."}
+          {tab === "mine" ? (
+            editable ? (
+              <>
+                <span className="hidden pointer-coarse:inline">
+                  {touchMode === "select"
+                    ? "선택 모드 · 드래그하면 시간을 고르거나 풀어요. 화면을 움직이려면 스크롤 모드로 바꾸세요."
+                    : "스크롤 모드 · 화면을 움직여요. 시간을 고르려면 선택 모드로 바꾸세요."}{" "}
+                  날짜나 시간을 2초 동안 누르고 있으면 반복할 수 있어요.
+                </span>
+                <span className="pointer-coarse:hidden">
+                  30분 단위 · 빈 칸부터 드래그하면 추가, 선택한 칸부터 드래그하면 해제. 날짜나
+                  오전·오후·저녁을 누르면 한 번에 고르거나 풀어요. 빗금 칸은 지난 시간이에요.
+                </span>
+              </>
+            ) : (
+              "마감되어 수정할 수 없어요."
+            )
+          ) : (
+            "진할수록 더 많은 사람이 가능해요. 칸을 누르면 누가 가능한지 보여요."
+          )}
         </p>
 
         <div className="mt-3">
@@ -356,11 +391,28 @@ export function AvailabilityBoard({
             onInspect={tab === "heatmap" ? setInspecting : undefined}
             onRepeatMenu={
               editable && tab === "mine"
-                ? (date, at, origin) => setRepeatMenu({ date, origin, ...at })
+                ? (date, at, origin, trigger) => setRepeatMenu({ date, origin, trigger, ...at })
                 : undefined
             }
+            touchMode={touchMode}
           />
         </div>
+
+        {/* 모바일: 반복 사용·제출은 화면 아래에 늘 보인다(Figma 23 "하단 제출 버튼은 항상 접근 가능") */}
+        {editable && tab === "mine" && (
+          <div className="sticky bottom-0 z-10 -mx-4 mt-3 grid grid-cols-2 gap-2 border-t border-line bg-surface px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:hidden">
+            <Button
+              variant="secondary"
+              disabled={selected.size === 0}
+              onClick={(e) => setRepeatMenu({ trigger: "button", origin: e.currentTarget })}
+            >
+              반복 사용
+            </Button>
+            <Button onClick={submit} disabled={pending}>
+              {submitLabel}
+            </Button>
+          </div>
+        )}
 
         <BottomBar>
           <div className="text-sm text-muted">
@@ -420,8 +472,8 @@ export function AvailabilityBoard({
               </Button>
             )}
             {editable && tab === "mine" && (
-              <Button onClick={submit} disabled={pending} className="sm:w-48">
-                {pending ? "제출하는 중…" : confirmEmpty ? "그래도 제출" : "가능 시간 제출"}
+              <Button onClick={submit} disabled={pending} className="hidden sm:flex sm:w-48">
+                {submitLabel}
               </Button>
             )}
           </div>
@@ -494,7 +546,18 @@ export function AvailabilityBoard({
           onClose={() => setConfirming(null)}
         />
       )}
-      {repeatMenu && editable && (
+      {repeatMenu && editable && repeatMenu.trigger !== "mouse" && (
+        <RepeatSheet
+          sources={repeatSources(selected)}
+          initialDate={repeatMenu.trigger === "touch" ? repeatMenu.date : undefined}
+          onChoose={(date, mode) => {
+            setRepeatMenu(null);
+            setRepeating({ date, origin: repeatMenu.origin, mode });
+          }}
+          onClose={() => closeRepeat(repeatMenu.origin)}
+        />
+      )}
+      {repeatMenu && editable && repeatMenu.trigger === "mouse" && (
         <RepeatMenu
           date={repeatMenu.date}
           ranges={slotRanges(selected, repeatMenu.date)}
@@ -573,10 +636,13 @@ function ToolButton({
 function Tab({
   active,
   onClick,
+  tall = false,
   children,
 }: {
   active: boolean;
   onClick: () => void;
+  /** 터치 영역 44px 이상(모바일 모드 전환, Figma 24) */
+  tall?: boolean;
   children: ReactNode;
 }) {
   return (
@@ -585,11 +651,17 @@ function Tab({
       role="tab"
       aria-selected={active}
       onClick={onClick}
-      className={`rounded-md px-4 py-2 text-sm ${active ? "bg-surface font-medium text-brand-ink shadow-sm" : "text-muted"}`}
+      className={`rounded-md px-4 py-2 text-sm ${tall ? "min-h-11" : ""} ${active ? "bg-surface font-medium text-brand-ink shadow-sm" : "text-muted"}`}
     >
       {children}
     </button>
   );
+}
+
+/** 반복 원본으로 고를 수 있는 날짜: 내 선택이 있는 날짜(오름차순)와 그날의 시간 */
+function repeatSources(selected: Set<number>): RepeatSource[] {
+  const dates = [...new Set([...selected].map((ms) => kstDate(new Date(ms))))].sort();
+  return dates.map((date) => ({ date, ranges: slotRanges(selected, date) }));
 }
 
 function BottomBar({ children }: { children: ReactNode }) {
