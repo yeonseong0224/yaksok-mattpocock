@@ -3,9 +3,13 @@ import type { ButtonHTMLAttributes, ReactNode } from "react";
 
 // 와이어프레임 공통 틀: 상단 AppHeader + 회색 바탕 위 흰 카드(Figma 05·06·22)
 
+/** 헤더 왼쪽 자리. 화면별 버튼(예: 모바일 약속 정보 ☰)을 포털로 넣는다. */
+export const HEADER_START_SLOT_ID = "app-header-start";
+
 export function AppHeader() {
   return (
     <header className="flex h-16 items-center border-b border-line bg-surface px-5">
+      <div id={HEADER_START_SLOT_ID} className="contents" />
       <Link href="/" className="text-lg font-bold text-brand-ink">
         ✓ 약속 잡기
       </Link>

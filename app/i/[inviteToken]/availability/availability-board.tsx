@@ -23,6 +23,7 @@ import {
 } from "../api";
 import { durationLabel, weekStartOf } from "../calendar";
 import { ParticipantRoster } from "../participant-home";
+import { PromiseDrawer } from "../promise-drawer";
 import { CandidateListPanel } from "./candidate-list";
 import { ConfirmDialog } from "./confirm-dialog";
 import { DateJumpDialog } from "./date-jump-dialog";
@@ -297,25 +298,33 @@ export function AvailabilityBoard({
   const maxCount = Math.max(0, ...counts.values());
   const submitLabel = pending ? "제출하는 중…" : confirmEmpty ? "그래도 제출" : "가능 시간 제출";
 
+  const promiseInfo = (
+    <>
+      <div>
+        <h1 className="text-xl font-bold">{title}</h1>
+        <StatusBadge status={data.status} />
+        <p className="mt-3 text-xs leading-5 text-muted">
+          {monthDay(settings.dateRangeStart)} – {monthDay(settings.dateRangeEnd)}
+          <br />
+          마감 {monthDay(deadline.slice(0, 10))} {deadline.slice(11, 16)} KST
+        </p>
+      </div>
+      <Button variant="secondary" onClick={onShowInvite}>
+        초대 링크 보기
+      </Button>
+      <ParticipantRoster promiseId={promiseId} me={me} onLoggedOut={onLoggedOut} compact />
+    </>
+  );
+
   return (
     <div className="grid gap-6 lg:grid-cols-[240px_1fr]">
-      <aside className="flex flex-col gap-4">
-        <div>
-          <h1 className="text-xl font-bold">{title}</h1>
-          <StatusBadge status={data.status} />
-          <p className="mt-3 text-xs leading-5 text-muted">
-            {monthDay(settings.dateRangeStart)} – {monthDay(settings.dateRangeEnd)}
-            <br />
-            마감 {monthDay(deadline.slice(0, 10))} {deadline.slice(11, 16)} KST
-          </p>
-        </div>
-        <Button variant="secondary" onClick={onShowInvite}>
-          초대 링크 보기
-        </Button>
-        <ParticipantRoster promiseId={promiseId} me={me} onLoggedOut={onLoggedOut} compact />
-      </aside>
+      {/* 약속 정보: 데스크톱은 왼쪽에, 좁은 화면은 헤더 ☰로 여는 서랍에(모바일 와이어프레임 PromiseSlide) */}
+      <aside className="hidden flex-col gap-4 lg:flex">{promiseInfo}</aside>
+      <PromiseDrawer>{promiseInfo}</PromiseDrawer>
 
       <section className="min-w-0">
+        {/* 좁은 화면에서는 약속 정보가 서랍에 들어가므로, 화면 읽기용 제목을 따로 둔다. */}
+        <h1 className="sr-only lg:hidden">{title}</h1>
         <h2 className="text-xl font-bold">
           {tab === "mine" ? "가능한 시간을 골라 주세요" : "모두의 가능한 시간을 확인하세요"}
         </h2>
