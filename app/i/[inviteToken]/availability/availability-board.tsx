@@ -23,9 +23,11 @@ import {
 } from "../api";
 import { durationLabel, weekStartOf } from "../calendar";
 import { ParticipantRoster } from "../participant-home";
+import { PromiseDrawer } from "../promise-drawer";
 import { CandidateListPanel } from "./candidate-list";
 import { ConfirmDialog } from "./confirm-dialog";
 import { DateJumpDialog } from "./date-jump-dialog";
+import { MiniCalendar } from "./mini-calendar";
 import { toSortedKstIsos, useLocalDraft } from "./local-draft";
 import { RepeatDialog } from "./repeat-dialog";
 import { RepeatMenu, type RepeatMode } from "./repeat-menu";
@@ -84,7 +86,8 @@ export function AvailabilityBoard({
   const [draft, setDraft] = useLocalDraft(promiseId, me.participantId);
   const [tab, setTab] = useState<"mine" | "heatmap">("mine");
   const [weekStart, setWeekStart] = useState<string | null>(null);
-  const [jumpOpen, setJumpOpen] = useState(false);
+  // 날짜 이동 팝업이 처음 보여줄 달(YYYY-MM-01). null이면 닫혀 있다.
+  const [jumpMonth, setJumpMonth] = useState<string | null>(null);
   const [confirmEmpty, setConfirmEmpty] = useState(false);
   const [pending, setPending] = useState(false);
   const [notice, setNotice] = useState<Notice>(null);
@@ -297,25 +300,50 @@ export function AvailabilityBoard({
   const maxCount = Math.max(0, ...counts.values());
   const submitLabel = pending ? "제출하는 중…" : confirmEmpty ? "그래도 제출" : "가능 시간 제출";
 
+  /** 약속 정보. afterNavigate는 날짜 이동 뒤에 부른다(모바일 서랍을 닫는다). */
+  const promiseInfo = (afterNavigate?: () => void) => (
+    <>
+      <div>
+        <h1 className="text-xl font-bold">{title}</h1>
+        <StatusBadge status={data.status} />
+        <p className="mt-3 text-xs leading-5 text-muted">
+          {monthDay(settings.dateRangeStart)} – {monthDay(settings.dateRangeEnd)}
+          <br />
+          마감 {monthDay(deadline.slice(0, 10))} {deadline.slice(11, 16)} KST
+        </p>
+      </div>
+      <MiniCalendar
+        key={shownWeek.slice(0, 7)}
+        initialMonth={`${shownWeek.slice(0, 7)}-01`}
+        rangeStart={settings.dateRangeStart}
+        rangeEnd={settings.dateRangeEnd}
+        today={today}
+        weekStart={shownWeek}
+        onPickDate={(date) => {
+          setWeekStart(weekStartOf(date));
+          afterNavigate?.();
+        }}
+        onOpenJump={(month) => {
+          afterNavigate?.();
+          setJumpMonth(month);
+        }}
+      />
+      <Button variant="secondary" onClick={onShowInvite}>
+        초대 링크 보기
+      </Button>
+      <ParticipantRoster promiseId={promiseId} me={me} onLoggedOut={onLoggedOut} compact />
+    </>
+  );
+
   return (
     <div className="grid gap-6 lg:grid-cols-[240px_1fr]">
-      <aside className="flex flex-col gap-4">
-        <div>
-          <h1 className="text-xl font-bold">{title}</h1>
-          <StatusBadge status={data.status} />
-          <p className="mt-3 text-xs leading-5 text-muted">
-            {monthDay(settings.dateRangeStart)} – {monthDay(settings.dateRangeEnd)}
-            <br />
-            마감 {monthDay(deadline.slice(0, 10))} {deadline.slice(11, 16)} KST
-          </p>
-        </div>
-        <Button variant="secondary" onClick={onShowInvite}>
-          초대 링크 보기
-        </Button>
-        <ParticipantRoster promiseId={promiseId} me={me} onLoggedOut={onLoggedOut} compact />
-      </aside>
+      {/* 약속 정보: 데스크톱은 왼쪽에, 좁은 화면은 헤더 ☰로 여는 서랍에(모바일 와이어프레임 PromiseSlide) */}
+      <aside className="hidden flex-col gap-4 lg:flex">{promiseInfo()}</aside>
+      <PromiseDrawer>{(close) => promiseInfo(close)}</PromiseDrawer>
 
       <section className="min-w-0">
+        {/* 좁은 화면에서는 약속 정보가 서랍에 들어가므로, 화면 읽기용 제목을 따로 둔다. */}
+        <h1 className="sr-only lg:hidden">{title}</h1>
         <h2 className="text-xl font-bold">
           {tab === "mine" ? "가능한 시간을 골라 주세요" : "모두의 가능한 시간을 확인하세요"}
         </h2>
@@ -330,7 +358,7 @@ export function AvailabilityBoard({
           </ToolButton>
           <button
             type="button"
-            onClick={() => setJumpOpen(true)}
+            onClick={() => setJumpMonth(`${shownWeek.slice(0, 7)}-01`)}
             className="h-10 rounded-lg border border-line bg-surface px-4 text-sm font-medium text-brand-ink hover:bg-canvas"
           >
             {weekLabel(shownWeek)}
@@ -587,16 +615,16 @@ export function AvailabilityBoard({
           onClose={() => closeRepeat(repeating.origin)}
         />
       )}
-      {jumpOpen && (
+      {jumpMonth && (
         <DateJumpDialog
-          initialMonth={`${shownWeek.slice(0, 7)}-01`}
+          initialMonth={jumpMonth}
           rangeStart={settings.dateRangeStart}
           rangeEnd={settings.dateRangeEnd}
           onPick={(date) => {
             setWeekStart(weekStartOf(date));
-            setJumpOpen(false);
+            setJumpMonth(null);
           }}
-          onClose={() => setJumpOpen(false)}
+          onClose={() => setJumpMonth(null)}
         />
       )}
     </div>
