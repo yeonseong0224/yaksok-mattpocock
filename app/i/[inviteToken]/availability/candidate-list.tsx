@@ -2,7 +2,13 @@
 
 import useSWR from "swr";
 import { kstDate } from "@/lib/time";
-import { candidatesUrl, getJson, type ApiError, type CandidateList } from "../api";
+import {
+  candidatesUrl,
+  getJson,
+  type ApiError,
+  type CandidateList,
+  type ScheduledTime,
+} from "../api";
 import { timeRangeLabel } from "../calendar";
 
 // 후보 목록(Figma 17·21, RESULT-06~10). 모집 중에는 현재 제출값 기준의 중간 후보,
@@ -11,11 +17,14 @@ export function CandidateListPanel({
   promiseId,
   pollMs,
   onPick,
+  onConfirm,
 }: {
   promiseId: string;
   pollMs: number;
   /** 후보를 누르면 그 날짜가 있는 주의 시간표로 옮긴다. */
   onPick: (date: string) => void;
+  /** 방장·마감 후에만 넘긴다. 후보마다 확정 버튼이 생긴다. */
+  onConfirm?: (candidate: ScheduledTime) => void;
 }) {
   const result = useSWR<CandidateList, ApiError>(candidatesUrl(promiseId), getJson, {
     refreshInterval: pollMs,
@@ -68,6 +77,15 @@ export function CandidateListPanel({
                     {c.participants.map((p) => p.nickname).join(", ")}
                   </p>
                 </button>
+                {onConfirm && (
+                  <button
+                    type="button"
+                    onClick={() => onConfirm(c)}
+                    className="mt-1 w-full rounded-lg bg-brand py-2 text-sm font-medium text-white hover:bg-brand-strong"
+                  >
+                    이 후보로 확정하기
+                  </button>
+                )}
               </li>
             );
           })}

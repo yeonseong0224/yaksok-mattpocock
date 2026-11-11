@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { invalidRequest, noStore } from "@/lib/api/responses";
+import { scheduledTimeJson, loadConfirmation } from "@/lib/candidates/load-candidates";
 import { authenticate, setSessionCookie } from "@/lib/members/session";
 import { promiseCancelled, promiseNotFound } from "@/lib/promises/errors";
 import {
@@ -33,14 +34,20 @@ export async function GET(
   }
 
   const isDraft = promise.status === "draft";
+  // 확정 일정: 끝 시각은 계산하고, 참석 가능한 사람은 현재 제출값으로 다시 계산한다(RESULT-13-01·13-02).
+  // 참석 가능 인원이 2명 미만이 돼도 확정은 그대로 두고, 방장에게만 알린다(hostActionRequired).
+  const confirmation =
+    promise.status === "confirmed" ? await loadConfirmation(prisma, promise) : null;
   const response = NextResponse.json({
     promiseId,
     promiseStatus,
     draftExpiresAt: isDraft ? toKstIso(draftExpiresAt(promise)) : null,
     draftExpired: isDraftExpired(promise),
     settings: settingsJson(promise),
-    // 확정 일정은 티켓 09에서 채운다.
-    currentConfirmation: null,
+    currentConfirmation: confirmation && {
+      ...scheduledTimeJson(confirmation),
+      hostActionRequired: viewer.role === "host" && confirmation.participants.length < 2,
+    },
   });
   // 쿠키 만료를 DB 세션 만료에 맞춘다(모집 시작으로 늘어난 만료를 다른 기기에도 반영).
   setSessionCookie(response, viewer.cookie);

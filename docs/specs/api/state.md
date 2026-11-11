@@ -680,6 +680,8 @@ if (!response.ok) {
 
 `POST /api/v1/promises/{promiseId}/confirmation`
 
+> **2026-11-10 결정 (첫 슬라이스 스펙·RESULT-11-02·12-02, 티켓 09 구현)**: 아래 원안과 다르게 구현한다. (1) 화면에 표시된 후보(서로 겹치지 않는 최대 5개) 중에서만 확정할 수 있다. 목록 밖의 유효 후보는 허용하지 않는다. (2) 다시 계산한 결과 요청한 시작 시각이 표시 후보가 아니면 `409 INVALID_CONFIRMATION_CANDIDATE`와 `details.candidates`(새 후보 목록, 후보 조회와 같은 모양)를 돌려준다(원안의 422 대신). (3) 기한 전 collecting이면 "먼저 조기 마감" 안내와 함께 `409 INVALID_PROMISE_STATE`. (4) 응답과 STATE-API-01의 `currentConfirmation`에는 참석 가능한 참여자의 닉네임(`participants[]`)도 담는다. 확정 당시 목록은 저장하지 않고 현재 제출값으로 다시 계산한다(RESULT-13-02).
+
 현재 active 방장이 미래 유효 후보 하나를 확정한다. 최신 공통 가능 인원을 다시 검사하고 confirmed_start_at을 저장한다.
 
 ### 0. 규칙 연결

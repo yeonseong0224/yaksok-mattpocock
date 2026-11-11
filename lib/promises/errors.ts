@@ -7,11 +7,11 @@ export const unauthenticated = () => apiError(401, "UNAUTHENTICATED", "다시 �
 export const forbidden = () => apiError(403, "FORBIDDEN", "이 작업을 수행할 권한이 없습니다.");
 export const draftExpired = () =>
   apiError(410, "DRAFT_EXPIRED", "설정 시간 10분이 지나 약속 초안이 만료됐어요.");
-export const invalidPromiseState = (promiseStatus: string, allowedStates: string[]) =>
-  apiError(409, "INVALID_PROMISE_STATE", "현재 약속 상태에서는 요청할 수 없습니다.", {
-    promiseStatus,
-    allowedStates,
-  });
+export const invalidPromiseState = (
+  promiseStatus: string,
+  allowedStates: string[],
+  message = "현재 약속 상태에서는 요청할 수 없습니다.",
+) => apiError(409, "INVALID_PROMISE_STATE", message, { promiseStatus, allowedStates });
 export const promiseNotOpen = () =>
   apiError(409, "PROMISE_NOT_OPEN", "방장이 약속을 설정 중입니다.");
 export const deadlinePassed = () => apiError(409, "DEADLINE_PASSED", "응답 마감이 지났습니다.");

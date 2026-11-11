@@ -190,3 +190,15 @@ export async function getCandidates(client: TestClient, promiseId: string) {
     params: { promiseId },
   });
 }
+
+// --- 확정(티켓 09) ---
+
+export async function confirmPromise(client: TestClient, promiseId: string, startAt: unknown) {
+  const { POST } = await import("@/app/api/v1/promises/[promiseId]/confirmation/route");
+  return client.request(POST, {
+    method: "POST",
+    path: `/api/v1/promises/${promiseId}/confirmation`,
+    params: { promiseId },
+    body: { startAt },
+  });
+}

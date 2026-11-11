@@ -14,6 +14,7 @@ import {
   type Me,
   type PromiseView,
 } from "./api";
+import { ConfirmedView } from "./confirmed-view";
 import { HostRegistrationForm } from "./host-registration-form";
 import { InviteLink } from "./invite-link";
 import { JoinPanel } from "./join-panel";
@@ -40,6 +41,8 @@ export function LinkEntry({ inviteToken }: { inviteToken: string }) {
   const [expiredByClock, setExpiredByClock] = useState(false);
   // 방장이 모집을 시작한 직후에는 초대 링크 화면(Figma 04)을 먼저 보여준다.
   const [showInvite, setShowInvite] = useState(false);
+  // 확정된 약속은 결과 화면(Figma 20)을 먼저 보여주고, "가능 시간 다시 보기"로 읽기 전용 시간표를 연다.
+  const [showSchedule, setShowSchedule] = useState(false);
 
   // 등록·로그인·로그아웃 뒤에는 화면에 쓰는 데이터를 모두 비우고 다시 받는다(이전 사람의 정보가 남지 않게).
   const { mutate } = useSWRConfig();
@@ -124,6 +127,20 @@ export function LinkEntry({ inviteToken }: { inviteToken: string }) {
       </>
     );
   }
+  const confirmation =
+    promise.data && "currentConfirmation" in promise.data ? promise.data.currentConfirmation : null;
+  if (status === "confirmed" && confirmation && !showSchedule) {
+    return (
+      <>
+        <ConfirmedView
+          title={settings.title ?? ""}
+          confirmation={confirmation}
+          onShowSchedule={() => setShowSchedule(true)}
+        />
+        <ParticipantRoster promiseId={promiseId} me={viewer} onLoggedOut={refresh} />
+      </>
+    );
+  }
   // 모집 중에는 가능 시간 입력, 마감 뒤에는 같은 화면을 읽기 전용으로 보여준다.
   // 후보·확정 결과(티켓 08·09)가 이 화면에 더해진다.
   return (
@@ -134,6 +151,10 @@ export function LinkEntry({ inviteToken }: { inviteToken: string }) {
       onShowInvite={() => setShowInvite(true)}
       onLoggedOut={refresh}
       onSessionLost={refresh}
+      onConfirmed={() => {
+        setShowSchedule(false);
+        return refresh();
+      }}
     />
   );
 }

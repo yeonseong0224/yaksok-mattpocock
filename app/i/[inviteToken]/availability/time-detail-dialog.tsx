@@ -8,14 +8,17 @@ import { timeRangeLabel } from "../calendar";
 
 // 시간 상세 팝업(Figma 18). 히트맵에서 슬롯을 누르면 그 30분에 누가 가능한지 보여준다.
 // 가능/불가능만 보여주고 미응답은 따로 구분하지 않는다(TIME-12-02, 2026-11-09 결정).
-// "이 시간으로 확정하기"는 티켓 09에서 방장·마감 후·표시 후보일 때만 더한다.
+// "이 시간으로 확정하기"는 방장에게, 마감 후에만, 그 슬롯이 표시 후보의 시작 시각일 때만 보인다.
 export function TimeDetailDialog({
   slotMs,
   participants,
+  onConfirm,
   onClose,
 }: {
   slotMs: number;
   participants: Availability["participants"];
+  /** 방장·마감 후·이 슬롯이 표시 후보의 시작일 때만 넘긴다(스토리 67, 2026-11-09 결정). */
+  onConfirm?: () => void;
   onClose: () => void;
 }) {
   const available = new Set(
@@ -66,7 +69,12 @@ export function TimeDetailDialog({
           ))}
         </ul>
         <p className="mt-3 text-xs text-muted">불가능 {unavailableCount}명</p>
-        <Button variant="secondary" onClick={onClose} className="mt-4">
+        {onConfirm && (
+          <Button onClick={onConfirm} className="mt-4">
+            이 시간으로 확정하기
+          </Button>
+        )}
+        <Button variant="secondary" onClick={onClose} className="mt-2">
           닫기
         </Button>
       </div>

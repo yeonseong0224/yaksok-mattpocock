@@ -41,8 +41,13 @@ export function dayLabel(date: string): string {
 
 /** "12월 1일 (화) 14:00–16:00". 끝이 다음 날 00:00이면 24:00으로 쓴다. 시각은 epoch 밀리초. */
 export function timeRangeLabel(startMs: number, endMs: number): string {
-  const start = toKstIso(new Date(startMs));
-  const end = toKstIso(new Date(endMs));
-  const endTime = end.slice(11, 16) === "00:00" ? "24:00" : end.slice(11, 16);
-  return `${dayLabel(start.slice(0, 10))} ${start.slice(11, 16)}–${endTime}`;
+  const { start, end } = clockRange(startMs, endMs);
+  return `${dayLabel(toKstIso(new Date(startMs)).slice(0, 10))} ${start}–${end}`;
+}
+
+/** 시작·끝의 한국 시각 "HH:mm". 끝이 다음 날 00:00이면 24:00으로 쓴다. */
+export function clockRange(startMs: number, endMs: number): { start: string; end: string } {
+  const start = toKstIso(new Date(startMs)).slice(11, 16);
+  const end = toKstIso(new Date(endMs)).slice(11, 16);
+  return { start, end: end === "00:00" ? "24:00" : end };
 }

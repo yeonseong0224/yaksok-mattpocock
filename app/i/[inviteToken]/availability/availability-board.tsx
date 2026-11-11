@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import useSWR from "swr";
 import { Button } from "@/app/_components/ui";
 import { addDays, hhmmToMinute, kstDate, toKstIso } from "@/lib/time";
@@ -8,17 +8,21 @@ import {
   ApiError,
   availabilityUrl,
   getJson,
+  candidatesUrl,
   closeUrl,
   myAvailabilityUrl,
   postJson,
   putJson,
   type Availability,
+  type CandidateList,
+  type ScheduledTime,
   type Me,
   type SubmitResult,
 } from "../api";
 import { weekStartOf } from "../calendar";
 import { ParticipantRoster } from "../participant-home";
 import { CandidateListPanel } from "./candidate-list";
+import { ConfirmDialog } from "./confirm-dialog";
 import { DateJumpDialog } from "./date-jump-dialog";
 import { toSortedKstIsos, useLocalDraft } from "./local-draft";
 import { TimeDetailDialog } from "./time-detail-dialog";
@@ -43,6 +47,7 @@ export function AvailabilityBoard({
   onShowInvite,
   onLoggedOut,
   onSessionLost,
+  onConfirmed,
 }: {
   promiseId: string;
   title: string;
@@ -50,6 +55,8 @@ export function AvailabilityBoard({
   onShowInvite: () => void;
   onLoggedOut: () => void;
   onSessionLost: () => void;
+  /** 확정됐을 때(내가 했거나 폴링으로 알게 됐을 때) 결과 화면으로 넘어간다. */
+  onConfirmed: () => void;
 }) {
   const availability = useSWR<Availability, ApiError>(availabilityUrl(promiseId), getJson, {
     refreshInterval: POLL_MS,
@@ -72,6 +79,20 @@ export function AvailabilityBoard({
   const [candidatesOpen, setCandidatesOpen] = useState(true);
   const [confirmClose, setConfirmClose] = useState(false);
   const [closing, setClosing] = useState(false);
+  const [confirming, setConfirming] = useState<ScheduledTime | null>(null);
+  // 후보 목록과 같은 키라 한 번만 조회된다. 확정 버튼을 보여줄 슬롯(표시 후보의 시작)을 알기 위해 쓴다.
+  const candidates = useSWR<CandidateList, ApiError>(candidatesUrl(promiseId), getJson, {
+    refreshInterval: POLL_MS,
+  });
+
+  const lastStatus = useRef(data?.status);
+  useEffect(() => {
+    const previous = lastStatus.current;
+    lastStatus.current = data?.status;
+    if (previous !== undefined && previous !== "confirmed" && data?.status === "confirmed") {
+      onConfirmed();
+    }
+  }, [data?.status, onConfirmed]);
 
   const serverSlots = useMemo(() => toMsSet(data?.me.slots ?? []), [data?.me.slots]);
   const counts = useMemo(() => {
@@ -233,6 +254,12 @@ export function AvailabilityBoard({
   }
 
   const isHost = me.role === "host";
+  // 확정은 방장만, 마감 뒤에만, 표시 후보 중에서만 한다(STATE-07-01, RESULT-11-02).
+  const canConfirm = isHost && data.status === "closed";
+  const inspectedCandidate =
+    inspecting === null
+      ? undefined
+      : candidates.data?.candidates.find((c) => Date.parse(c.startAt) === inspecting);
   const showCandidates = candidatesOpen;
   const deadline = toKstIso(new Date(settings.votingDeadlineAt));
   const monthDay = (d: string) => d.slice(5).replace("-", ".");
@@ -353,6 +380,17 @@ export function AvailabilityBoard({
                 {closing ? "마감하는 중…" : confirmClose ? "마감하기" : "조기 마감"}
               </Button>
             )}
+            {canConfirm && (
+              <Button
+                onClick={() => {
+                  setCandidatesOpen(true);
+                  setNotice({ tone: "info", text: "아래 후보 중 확정할 시간을 골라 주세요." });
+                }}
+                className="sm:w-40"
+              >
+                일정 확정하기
+              </Button>
+            )}
             {editable && tab === "mine" && (
               <Button onClick={submit} disabled={pending} className="sm:w-48">
                 {pending ? "제출하는 중…" : confirmEmpty ? "그래도 제출" : "가능 시간 제출"}
@@ -368,7 +406,16 @@ export function AvailabilityBoard({
               setWeekStart(weekStartOf(date));
               setTab("heatmap");
             }}
+            onConfirm={canConfirm ? setConfirming : undefined}
           />
+        )}
+        {data.status === "confirmed" && (
+          <div className="mt-3 flex items-center justify-between gap-3 rounded-lg bg-brand/10 px-4 py-3 text-sm text-brand-ink">
+            <span>약속이 확정됐어요.</span>
+            <button type="button" onClick={onConfirmed} className="font-medium underline">
+              확정 결과 보기
+            </button>
+          </div>
         )}
         {notice && (
           <p
@@ -389,7 +436,34 @@ export function AvailabilityBoard({
         <TimeDetailDialog
           slotMs={inspecting}
           participants={data.participants}
+          onConfirm={
+            canConfirm && inspectedCandidate
+              ? () => {
+                  setConfirming(inspectedCandidate);
+                  setInspecting(null);
+                }
+              : undefined
+          }
           onClose={() => setInspecting(null)}
+        />
+      )}
+      {confirming && (
+        <ConfirmDialog
+          promiseId={promiseId}
+          candidate={confirming}
+          hostParticipantId={me.participantId}
+          onConfirmed={() => {
+            setConfirming(null);
+            onConfirmed();
+          }}
+          onCandidatesChanged={(latest) => {
+            // 새 후보 목록으로 바로 다시 그리고 펼친다(스토리 69). 다시 조회하지 않는다.
+            void candidates.mutate((current) => current && { ...current, candidates: latest }, {
+              revalidate: false,
+            });
+            setCandidatesOpen(true);
+          }}
+          onClose={() => setConfirming(null)}
         />
       )}
       {jumpOpen && (
