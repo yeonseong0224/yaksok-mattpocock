@@ -24,7 +24,12 @@ const subscribeNothing = () => () => {};
 const getHeaderSlot = () => document.getElementById(HEADER_START_SLOT_ID);
 const getNoSlot = () => null;
 
-export function PromiseDrawer({ children }: { children: ReactNode }) {
+export function PromiseDrawer({
+  children,
+}: {
+  /** 서랍 내용. 받은 함수로, 날짜 이동처럼 화면을 바꾸는 동작 뒤에 서랍을 닫는다. */
+  children: (close: () => void) => ReactNode;
+}) {
   const [open, setOpen] = useState(false);
   const slot = useSyncExternalStore(subscribeNothing, getHeaderSlot, getNoSlot);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -50,7 +55,10 @@ export function PromiseDrawer({ children }: { children: ReactNode }) {
           </button>,
           slot,
         )}
-      {open && <DrawerPanel onClose={close}>{children}</DrawerPanel>}
+      {open && (
+        // 날짜 이동으로 닫을 때는 화면이 바뀌므로 포커스를 ☰로 되돌리지 않는다.
+        <DrawerPanel onClose={close}>{children(() => setOpen(false))}</DrawerPanel>
+      )}
     </>
   );
 }

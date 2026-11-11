@@ -25,7 +25,8 @@ export function MonthHeader({
   );
 }
 
-function MonthButton({
+/** 달력의 ‹ › 버튼 */
+export function MonthButton({
   label,
   onClick,
   children,
