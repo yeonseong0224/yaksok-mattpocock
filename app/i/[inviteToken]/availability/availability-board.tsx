@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import useSWR from "swr";
 import { Button } from "@/app/_components/ui";
+import { slotRanges } from "@/lib/availability/repeat";
+import type { SlotRange } from "@/lib/availability/slots";
 import { addDays, hhmmToMinute, kstDate, toKstIso } from "@/lib/time";
 import {
   ApiError,
@@ -19,12 +21,14 @@ import {
   type Me,
   type SubmitResult,
 } from "../api";
-import { weekStartOf } from "../calendar";
+import { durationLabel, weekStartOf } from "../calendar";
 import { ParticipantRoster } from "../participant-home";
 import { CandidateListPanel } from "./candidate-list";
 import { ConfirmDialog } from "./confirm-dialog";
 import { DateJumpDialog } from "./date-jump-dialog";
 import { toSortedKstIsos, useLocalDraft } from "./local-draft";
+import { RepeatDialog } from "./repeat-dialog";
+import { RepeatMenu, type RepeatMode } from "./repeat-menu";
 import { TimeDetailDialog } from "./time-detail-dialog";
 import { WeekGrid, type SlotView } from "./week-grid";
 
@@ -39,6 +43,8 @@ const sameSet = (a: Set<number>, b: Set<number>) =>
   a.size === b.size && [...a].every((x) => b.has(x));
 
 type Notice = { tone: "info" | "error"; text: string } | null;
+/** 반복 메뉴·팝업의 원본 날짜. origin은 닫을 때 포커스를 돌려줄 요소다. */
+type RepeatSource = { date: string; origin: HTMLElement };
 
 export function AvailabilityBoard({
   promiseId,
@@ -80,6 +86,11 @@ export function AvailabilityBoard({
   const [confirmClose, setConfirmClose] = useState(false);
   const [closing, setClosing] = useState(false);
   const [confirming, setConfirming] = useState<ScheduledTime | null>(null);
+  // 우클릭 반복 메뉴(Figma 09)와 반복 팝업(Figma 10·11)
+  const [repeatMenu, setRepeatMenu] = useState<(RepeatSource & { x: number; y: number }) | null>(
+    null,
+  );
+  const [repeating, setRepeating] = useState<(RepeatSource & { mode: RepeatMode }) | null>(null);
   // 후보 목록과 같은 키라 한 번만 조회된다. 확정 버튼을 보여줄 슬롯(표시 후보의 시작)을 알기 위해 쓴다.
   const candidates = useSWR<CandidateList, ApiError>(candidatesUrl(promiseId), getJson, {
     refreshInterval: POLL_MS,
@@ -140,6 +151,12 @@ export function AvailabilityBoard({
   }
 
   const { settings } = data;
+  const slotRange: SlotRange = {
+    dateRangeStart: settings.dateRangeStart,
+    dateRangeEnd: settings.dateRangeEnd,
+    dailyStartMinute: hhmmToMinute(settings.dailyStartTime),
+    dailyEndMinute: hhmmToMinute(settings.dailyEndTime),
+  };
   const serverNow = Date.parse(data.serverTime);
   const today = kstDate(new Date(serverNow));
   const editable = data.status === "collecting";
@@ -170,6 +187,12 @@ export function AvailabilityBoard({
     setDraft({ slots: next, baseVersion: draft?.baseVersion ?? data!.me.version });
     setConfirmEmpty(false);
     setNotice(null);
+  }
+
+  function closeRepeat(origin: HTMLElement) {
+    setRepeatMenu(null);
+    setRepeating(null);
+    if (origin.isConnected) origin.focus();
   }
 
   async function submit() {
@@ -323,14 +346,19 @@ export function AvailabilityBoard({
         <div className="mt-3">
           <WeekGrid
             weekStart={shownWeek}
-            dailyStartMinute={hhmmToMinute(settings.dailyStartTime)}
-            dailyEndMinute={hhmmToMinute(settings.dailyEndTime)}
+            dailyStartMinute={slotRange.dailyStartMinute}
+            dailyEndMinute={slotRange.dailyEndMinute}
             mode={tab}
             total={data.totalParticipants}
             today={today}
             slotView={slotView}
             onSelect={editable && tab === "mine" ? applySelection : undefined}
             onInspect={tab === "heatmap" ? setInspecting : undefined}
+            onRepeatMenu={
+              editable && tab === "mine"
+                ? (date, at, origin) => setRepeatMenu({ date, origin, ...at })
+                : undefined
+            }
           />
         </div>
 
@@ -466,6 +494,36 @@ export function AvailabilityBoard({
           onClose={() => setConfirming(null)}
         />
       )}
+      {repeatMenu && editable && (
+        <RepeatMenu
+          date={repeatMenu.date}
+          ranges={slotRanges(selected, repeatMenu.date)}
+          x={repeatMenu.x}
+          y={repeatMenu.y}
+          onChoose={(mode) => {
+            setRepeatMenu(null);
+            setRepeating({ date: repeatMenu.date, origin: repeatMenu.origin, mode });
+          }}
+          onClose={() => closeRepeat(repeatMenu.origin)}
+        />
+      )}
+      {repeating && editable && (
+        <RepeatDialog
+          source={repeating.date}
+          selected={selected}
+          range={slotRange}
+          now={serverNow}
+          today={today}
+          initialMode={repeating.mode}
+          onApply={(plan) => {
+            // 제출 전 내 선택에 합집합으로 더한다. 이 브라우저에 임시 저장되고, 제출해야 서버에 반영된다.
+            applySelection(plan.slots, true);
+            closeRepeat(repeating.origin);
+            setNotice({ tone: "info", text: "반복 시간을 추가했어요 · 제출하면 응답이 저장돼요" });
+          }}
+          onClose={() => closeRepeat(repeating.origin)}
+        />
+      )}
       {jumpOpen && (
         <DateJumpDialog
           initialMonth={`${shownWeek.slice(0, 7)}-01`}
@@ -551,10 +609,4 @@ function weekLabel(weekStart: string): string {
       ? `${Number(end.slice(8, 10))}일`
       : `${Number(end.slice(5, 7))}월 ${Number(end.slice(8, 10))}일`;
   return `${y}년 ${m}월 · ${Number(weekStart.slice(8, 10))}–${endPart}`;
-}
-
-function durationLabel(minutes: number): string {
-  const h = Math.floor(minutes / 60);
-  const m = minutes % 60;
-  return [h > 0 ? `${h}시간` : "", m > 0 ? `${m}분` : ""].filter(Boolean).join(" ");
 }

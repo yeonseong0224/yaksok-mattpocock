@@ -28,6 +28,11 @@ export function addDays(date: string, days: number): string {
   return new Date(Date.parse(`${date}T00:00:00Z`) + days * DAY_MS).toISOString().slice(0, 10);
 }
 
+/** YYYY-MM-DD 날짜의 요일(0 = 일요일) */
+export function weekday(date: string): number {
+  return new Date(`${date}T00:00:00Z`).getUTCDay();
+}
+
 /** 실제로 있는 날짜의 YYYY-MM-DD 문자열인가(2026-11-31은 아니다) */
 export function isDateString(value: string): boolean {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;

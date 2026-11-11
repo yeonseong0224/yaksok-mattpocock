@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type PointerEvent } from "react";
+import { useState, type MouseEvent, type PointerEvent } from "react";
 import { addDays, kstMidnight, MINUTE_MS } from "@/lib/time";
 import { WEEKDAYS, weekday } from "../calendar";
 
@@ -43,6 +43,7 @@ export function WeekGrid({
   slotView,
   onSelect,
   onInspect,
+  onRepeatMenu,
 }: {
   /** 그 주 일요일(YYYY-MM-DD) */
   weekStart: string;
@@ -57,6 +58,11 @@ export function WeekGrid({
   onSelect?: (slots: number[], add: boolean) => void;
   /** 히트맵에서 슬롯을 누르면 그 시간의 상세(누가 가능한지)를 연다. */
   onInspect?: (slotMs: number) => void;
+  /**
+   * 날짜 열(머리글·칸)을 우클릭하면 그 날짜의 반복 메뉴를 연다(Figma 09).
+   * origin은 메뉴를 닫을 때 포커스를 돌려줄 요소다.
+   */
+  onRepeatMenu?: (date: string, at: { x: number; y: number }, origin: HTMLElement) => void;
 }) {
   const [drag, setDrag] = useState<Drag | null>(null);
   const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
@@ -147,17 +153,44 @@ export function WeekGrid({
     }
   }
 
+  function onContextMenu(e: MouseEvent<HTMLDivElement>) {
+    if (!selectable || !onRepeatMenu) return;
+    const column = e.target instanceof Element ? e.target.closest<HTMLElement>("[data-day]") : null;
+    if (!column) return;
+    e.preventDefault();
+    // 닫을 때 포커스를 돌려줄 곳: 누른 버튼, 그게 안 되면(범위 밖·지난 칸) 그날 머리글 버튼, 그것도 안 되면 격자.
+    const enabledButton = (el: Element | null) =>
+      el instanceof HTMLButtonElement && !el.disabled ? el : null;
+    const origin =
+      enabledButton((e.target as Element).closest("button")) ??
+      enabledButton(
+        e.currentTarget.querySelector(
+          `[role=columnheader][data-day="${column.dataset.day}"] button`,
+        ),
+      ) ??
+      e.currentTarget;
+    // 키보드(메뉴 키·Shift+F10)로 열면 좌표가 0이라 요소 위치에 연다.
+    const rect = origin.getBoundingClientRect();
+    const at =
+      e.clientX === 0 && e.clientY === 0
+        ? { x: rect.left, y: rect.bottom }
+        : { x: e.clientX, y: e.clientY };
+    onRepeatMenu(days[Number(column.dataset.day)], at, origin);
+  }
+
   return (
     <div className="overflow-x-auto rounded-xl border border-line bg-surface">
       <div
         role="grid"
+        tabIndex={-1}
         aria-label="주간 가능 시간표"
-        className={`grid min-w-[640px] ${selectable ? "select-none" : ""}`}
+        className={`grid min-w-[640px] outline-none ${selectable ? "select-none" : ""}`}
         style={{ gridTemplateColumns: "56px repeat(7, minmax(0, 1fr))" }}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={finishDrag}
         onPointerCancel={() => setDrag(null)}
+        onContextMenu={onContextMenu}
       >
         <div className="flex items-end border-b border-line px-2 pb-1 text-[11px] text-muted">
           KST
@@ -180,7 +213,12 @@ export function WeekGrid({
           // 날짜를 누르면 그날 전체, 블록을 누르면 그 블록만(TIME-09-01·09-02).
           const whole = openSlotsOf(day, allRows).coverage;
           return (
-            <div key={date} role="columnheader" className="border-b border-l border-line p-1">
+            <div
+              key={date}
+              role="columnheader"
+              data-day={day}
+              className="border-b border-l border-line p-1"
+            >
               <GroupButton
                 coverage={whole}
                 label={`${date} 하루 전체`}

@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { Button } from "@/app/_components/ui";
-import { monthCells, monthLabel, shiftMonth, WEEKDAYS } from "../calendar";
+import { monthCells, WEEKDAYS } from "../calendar";
+import { MonthHeader } from "../month-header";
 import { useCloseOnEscape } from "../use-close-on-escape";
 
 // 이동할 날짜 선택 팝업(Figma 13~15). 날짜를 누르면 그 주로 이동한다. 회색 날짜는 입력 범위 밖이다.
@@ -38,15 +39,7 @@ export function DateJumpDialog({
           이동할 날짜 선택
         </h2>
         <div className="mt-4 rounded-xl border border-line p-3">
-          <div className="mb-2 flex items-center justify-between">
-            <NavButton label="이전 달" onClick={() => setMonth(shiftMonth(month, -1))}>
-              ‹
-            </NavButton>
-            <p className="text-lg font-bold">{monthLabel(month)}</p>
-            <NavButton label="다음 달" onClick={() => setMonth(shiftMonth(month, 1))}>
-              ›
-            </NavButton>
-          </div>
+          <MonthHeader month={month} onChange={setMonth} />
           <div className="grid grid-cols-7 gap-1 text-center">
             {WEEKDAYS.map((d) => (
               <div key={d} className="py-1 text-xs text-muted">
@@ -83,26 +76,5 @@ export function DateJumpDialog({
         </Button>
       </div>
     </div>
-  );
-}
-
-function NavButton({
-  label,
-  onClick,
-  children,
-}: {
-  label: string;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      aria-label={label}
-      onClick={onClick}
-      className="flex h-9 w-9 items-center justify-center rounded-lg border border-line text-lg text-brand-ink hover:bg-canvas"
-    >
-      {children}
-    </button>
   );
 }
