@@ -147,6 +147,7 @@ export function LinkEntry({ inviteToken }: { inviteToken: string }) {
     <AvailabilityBoard
       promiseId={promiseId}
       title={settings.title ?? ""}
+      participantLimit={settings.participantLimit}
       me={viewer}
       onShowInvite={() => setShowInvite(true)}
       onLoggedOut={refresh}

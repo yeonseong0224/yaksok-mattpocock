@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import useSWR from "swr";
-import { Button } from "@/app/_components/ui";
+import { Button, HEADER_START_SLOT_ID } from "@/app/_components/ui";
 import { slotRanges } from "@/lib/availability/repeat";
 import type { SlotRange } from "@/lib/availability/slots";
 import { addDays, hhmmToMinute, kstDate, toKstIso } from "@/lib/time";
@@ -27,6 +27,7 @@ import { PromiseDrawer } from "../promise-drawer";
 import { CandidateListPanel } from "./candidate-list";
 import { ConfirmDialog } from "./confirm-dialog";
 import { DateJumpDialog } from "./date-jump-dialog";
+import { HostSettingsDialog } from "./host-settings-dialog";
 import { MiniCalendar } from "./mini-calendar";
 import { toSortedKstIsos, useLocalDraft } from "./local-draft";
 import { RepeatDialog } from "./repeat-dialog";
@@ -59,6 +60,7 @@ type RepeatOpen =
 export function AvailabilityBoard({
   promiseId,
   title,
+  participantLimit,
   me,
   onShowInvite,
   onLoggedOut,
@@ -67,6 +69,8 @@ export function AvailabilityBoard({
 }: {
   promiseId: string;
   title: string;
+  /** 방장 포함 최대 인원(방장 설정 보기에 쓴다) */
+  participantLimit: number | null;
   me: Me;
   onShowInvite: () => void;
   onLoggedOut: () => void;
@@ -88,6 +92,8 @@ export function AvailabilityBoard({
   const [weekStart, setWeekStart] = useState<string | null>(null);
   // 날짜 이동 팝업이 처음 보여줄 달(YYYY-MM-01). null이면 닫혀 있다.
   const [jumpMonth, setJumpMonth] = useState<string | null>(null);
+  // 방장 설정 보기(읽기 전용). 닫으면 포커스를 연 버튼으로 돌려준다.
+  const [settingsFrom, setSettingsFrom] = useState<HTMLElement | null>(null);
   const [confirmEmpty, setConfirmEmpty] = useState(false);
   const [pending, setPending] = useState(false);
   const [notice, setNotice] = useState<Notice>(null);
@@ -332,6 +338,17 @@ export function AvailabilityBoard({
         초대 링크 보기
       </Button>
       <ParticipantRoster promiseId={promiseId} me={me} onLoggedOut={onLoggedOut} compact />
+      {isHost && (
+        <Button
+          variant="secondary"
+          onClick={(e) => {
+            afterNavigate?.();
+            setSettingsFrom(e.currentTarget);
+          }}
+        >
+          방장 설정 보기
+        </Button>
+      )}
     </>
   );
 
@@ -613,6 +630,19 @@ export function AvailabilityBoard({
             setNotice({ tone: "info", text: "반복 시간을 추가했어요 · 제출하면 응답이 저장돼요" });
           }}
           onClose={() => closeRepeat(repeating.origin)}
+        />
+      )}
+      {settingsFrom && (
+        <HostSettingsDialog
+          settings={{ ...settings, title, participantLimit }}
+          onClose={() => {
+            // 모바일 서랍에서 열었으면 그 버튼은 사라졌으니 헤더 ☰로 돌려준다.
+            const target = settingsFrom.isConnected
+              ? settingsFrom
+              : document.querySelector<HTMLElement>(`#${HEADER_START_SLOT_ID} button`);
+            target?.focus();
+            setSettingsFrom(null);
+          }}
         />
       )}
       {jumpMonth && (
