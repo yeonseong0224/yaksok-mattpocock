@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { monthCells, monthLabel, shiftMonth, WEEKDAYS } from "./calendar";
+import { monthCells, WEEKDAYS } from "./calendar";
+import { MonthHeader } from "./month-header";
 
 // 월간 달력에서 시작일·종료일을 클릭해 날짜 범위를 고른다(Figma 01·02, TIME-04-01~03).
 // 첫 클릭은 시작일, 두 번째 클릭은 종료일. 고를 수 없는 날짜는 비활성으로 보인다.
@@ -48,17 +49,7 @@ export function RangeCalendar({
 
   return (
     <div className="rounded-xl border border-line bg-surface p-3">
-      <div className="mb-2 flex items-center justify-between">
-        <MonthButton label="이전 달" onClick={() => setMonth(shiftMonth(month, -1))}>
-          ‹
-        </MonthButton>
-        <p className="text-lg font-bold" aria-live="polite">
-          {monthLabel(month)}
-        </p>
-        <MonthButton label="다음 달" onClick={() => setMonth(shiftMonth(month, 1))}>
-          ›
-        </MonthButton>
-      </div>
+      <MonthHeader month={month} onChange={setMonth} />
       <div className="grid grid-cols-7 gap-1 text-center" role="grid">
         {WEEKDAYS.map((d) => (
           <div key={d} className="py-1 text-xs text-muted">
@@ -80,27 +71,6 @@ export function RangeCalendar({
         )}
       </div>
     </div>
-  );
-}
-
-function MonthButton({
-  label,
-  onClick,
-  children,
-}: {
-  label: string;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      aria-label={label}
-      onClick={onClick}
-      className="flex h-9 w-9 items-center justify-center rounded-lg border border-line text-lg text-brand-ink hover:bg-canvas"
-    >
-      {children}
-    </button>
   );
 }
 
