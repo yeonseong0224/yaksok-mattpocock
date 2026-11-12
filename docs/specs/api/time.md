@@ -352,26 +352,26 @@ export async function PUT(req: Request, { params }: { params: Promise<{ promiseI
 
 **Status Code: 200 OK**
 
-| 이름                                   | 타입                            | 설명                                                                                                |
-| -------------------------------------- | ------------------------------- | --------------------------------------------------------------------------------------------------- |
-| status                                 | string                          | effectiveStatus. collecting / closed / confirmed. DB가 collecting이어도 현재 시각 ≥ 마감이면 closed |
-| serverTime **[제안]**                  | string (ISO-8601, 밀리초 3자리) | 조회 기준 서버 시각. 남은 시간 표시와 지난 슬롯 회색 처리에 기기 시계 대신 사용(TIME-15-03)         |
-| settings.dateRangeStart / dateRangeEnd | string (YYYY-MM-DD)             | 선택 가능 날짜 범위(양끝 포함, 한국 날짜)                                                           |
-| settings.dailyStartTime / dailyEndTime | string ("HH:mm")                | 하루 선택 가능 시각 경계. 종료는 "24:00" 가능                                                       |
-| settings.durationMinutes               | integer                         | 약속 소요 시간(30의 배수)                                                                           |
-| settings.votingDeadlineAt              | string (ISO-8601)               | 응답 마감 시각                                                                                      |
-| totalParticipants                      | integer                         | active 참여자 전체 수. 가능 인원 표시의 분모                                                        |
-| participants[]                         | array                           | active 참여자 목록. 등록순                                                                          |
-| participants[].participantId           | string (UUID)                   | 참여자 ID                                                                                           |
-| participants[].nickname                | string                          | 표시 이름                                                                                           |
-| participants[].isHost                  | boolean                         | 방장 여부(표시용)                                                                                   |
-| participants[].availableSlots          | string[]                        | 제출 완료자만 저장된 슬롯을 담는다. 미제출·제출 해제·빈 선택 제출은 모두 []. 시각 오름차순          |
-| me.participantId                       | string (UUID)                   | 내 참여자 ID                                                                                        |
-| me.version                             | integer                         | 내 availability_version. TIME-API-01의 baseVersion으로 쓴다                                         |
-| me.submitted                           | boolean                         | 내 제출 여부. 제출 해제 상태면 false                                                                |
-| me.slots                               | string[]                        | 서버에 저장된 내 슬롯. 제출 해제 상태에서도 그대로 보여줘 확인 후 다시 제출할 수 있게 한다          |
+| 이름                                   | 타입                            | 설명                                                                                                                                                                                      |
+| -------------------------------------- | ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| status                                 | string                          | effectiveStatus. collecting / closed / confirmed. DB가 collecting이어도 현재 시각 ≥ 마감이면 closed                                                                                       |
+| serverTime **[제안]**                  | string (ISO-8601, 밀리초 3자리) | 조회 기준 서버 시각. 남은 시간 표시와 지난 슬롯 회색 처리에 기기 시계 대신 사용(TIME-15-03)                                                                                               |
+| settings.dateRangeStart / dateRangeEnd | string (YYYY-MM-DD)             | 선택 가능 날짜 범위(양끝 포함, 한국 날짜)                                                                                                                                                 |
+| settings.dailyStartTime / dailyEndTime | string ("HH:mm")                | 하루 선택 가능 시각 경계. 종료는 "24:00" 가능                                                                                                                                             |
+| settings.durationMinutes               | integer                         | 약속 소요 시간(30의 배수)                                                                                                                                                                 |
+| settings.votingDeadlineAt              | string (ISO-8601)               | 응답 마감 시각                                                                                                                                                                            |
+| totalParticipants                      | integer                         | active 참여자 전체 수. 가능 인원 표시의 분모                                                                                                                                              |
+| participants[]                         | array                           | active 참여자 목록. 등록순                                                                                                                                                                |
+| participants[].participantId           | string (UUID)                   | 참여자 ID                                                                                                                                                                                 |
+| participants[].nickname                | string                          | 표시 이름                                                                                                                                                                                 |
+| participants[].isHost                  | boolean                         | 방장 여부(표시용)                                                                                                                                                                         |
+| participants[].availableSlots          | string[]                        | 서버에 저장된(제출된) 슬롯을 담는다. 범위 확대로 제출이 해제된 참여자도 범위 안에 남은 슬롯을 담는다(2026-11-11 결정, X-07). 한 번도 제출하지 않았거나 빈 선택 제출이면 []. 시각 오름차순 |
+| me.participantId                       | string (UUID)                   | 내 참여자 ID                                                                                                                                                                              |
+| me.version                             | integer                         | 내 availability_version. TIME-API-01의 baseVersion으로 쓴다                                                                                                                               |
+| me.submitted                           | boolean                         | 내 제출 여부. 제출 해제 상태면 false                                                                                                                                                      |
+| me.slots                               | string[]                        | 서버에 저장된 내 슬롯. 제출 해제 상태에서도 그대로 보여줘 확인 후 다시 제출할 수 있게 한다                                                                                                |
 
-participants[] 안의 내 항목은 다른 사람과 같은 규칙을 따른다. 그래서 제출 해제 상태면 내 항목의 availableSlots는 []이고, me.slots에는 저장된 슬롯이 남아 있다. 지난 시각 슬롯도 저장된 그대로 내려주며, 화면에서 serverTime 기준으로 지난 칸을 구분한다.
+participants[] 안의 내 항목은 다른 사람과 같은 규칙을 따른다. 제출 해제 상태여도 내 항목의 availableSlots와 me.slots에는 저장된 슬롯이 그대로 있다(2026-11-11 결정, X-07). 지난 시각 슬롯도 저장된 그대로 내려주며, 화면에서 serverTime 기준으로 지난 칸을 구분한다.
 
 ```json
 {
@@ -433,7 +433,7 @@ participants[] 안의 내 항목은 다른 사람과 같은 규칙을 따른다.
 3. promises 행을 읽는다. 없으면 404. 하루 경계는 분 값(`daily_start_minute`·`daily_end_minute`)으로 읽어 응답에서 "HH:mm"으로 바꾼다(1440 → "24:00").
 4. effectiveStatus를 계산한다. cancelled는 409 PROMISE_CANCELLED, draft는 409 PROMISE_NOT_COLLECTING. collecting이면서 현재 시각 ≥ 마감이면 closed로 계산만 하고 DB는 바꾸지 않는다.
 5. 세션의 참여자가 이 약속 소속이고 active인지 확인한다. 아니면 401 UNAUTHENTICATED(탈퇴·내보내기 포함, ERD 11절).
-6. active 참여자와 그 슬롯을 읽는다. 제출 시각이 있는 참여자만 availableSlots에 슬롯을 담고, 나머지는 []로 둔다.
+6. active 참여자와 그 슬롯을 읽어 availableSlots에 담는다. 제출 해제 상태여도 저장된 슬롯을 담는다(2026-11-11 결정, X-07).
 7. 내 version·제출 여부·저장 슬롯으로 me를 만든다.
 8. `Cache-Control: no-store`로 200을 반환한다.
 
@@ -535,7 +535,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ promiseI
         participantId: x.id,
         nickname: x.nickname,
         isHost: x.role === "host",
-        availableSlots: x.availabilitySubmittedAt ? slotsOf(x) : [], // 제출 여부 자체는 노출하지 않음
+        availableSlots: slotsOf(x), // 제출 해제 상태여도 남은 슬롯은 집계(X-07). 제출 여부 자체는 노출하지 않음
       })),
       me: {
         participantId: me.id,
@@ -591,7 +591,7 @@ sequenceDiagram
 
 1. 승주가 수정 중이다(기준 버전 3).
 2. 방장이 종료일을 늘리면 STATE-09-04에 따라 승주의 제출이 해제되고, STATE 범위 변경 API가 버전을 4로 올린다.
-3. 다음 폴링에서 "기준 3 ≠ 현재 4"이므로 로컬을 폐기하고, 서버에 남은 슬롯(`me.slots`)을 보여준 뒤 새 범위를 확인해 다시 제출하도록 안내한다.
+3. 다음 폴링에서 "기준 3 ≠ 현재 4"이므로 로컬을 폐기하고, 서버에 남은 슬롯(`me.slots`)을 보여준 뒤 새 범위를 확인해 다시 제출하도록 안내한다. 다시 제출하기 전에도 남은 슬롯은 집계·후보 계산에 들어간다(2026-11-11 결정, X-07).
 
 ### 왜 제출 시각이 아니라 버전인가
 
@@ -656,10 +656,10 @@ sequenceDiagram
 
 ## 용어
 
-- **미제출**: 한 번도 제출하지 않았거나 제출이 해제된 상태. 제출 시각이 비어 있다. 화면에는 모든 시간 "불가능"(TIME-12-02).
+- **미제출**: 한 번도 제출하지 않은 상태. 제출 시각이 비어 있다. 화면에는 모든 시간 "불가능"(TIME-12-02).
 - **빈 선택 제출**: 슬롯 0개로 제출한 것. 모든 시간 불가능이며 제출 시각은 있다(TIME-12-01).
 - **재제출**: 제출 후 수정해서 다시 제출하는 것. 재제출 전까지 기존 제출값이 유지된다(TIME-11-02).
-- **제출 해제**: 범위가 늘어나 서버가 제출 시각을 비우고 버전을 +1 하는 것(STATE-09-04). 다시 제출하기 전까지 미제출로 본다(TIME-10-03). DB의 슬롯은 남아 있지만 다른 참여자에게는 보이지 않는다.
+- **제출 해제**: 범위가 늘어나 서버가 제출 시각을 비우고 버전을 +1 하는 것(STATE-09-04). 범위 안에 남은 슬롯은 다시 제출하기 전에도 계속 집계·후보 계산에 들어가고 다른 참여자에게도 보인다. 새로 생긴 시간만 고르지 않은 것으로 본다(2026-11-11 결정, X-07).
 - **기준 버전**: 로컬 수정을 시작한 시점의 서버 버전. 서버 값과 다르면 로컬을 폐기하고 제출을 거절한다(TIME-10-04).
 - **재설정**: collecting 중 설정 변경. 상태는 그대로다(STATE-01-02).
 - **재조율**: closed·confirmed를 collecting으로 되돌리는 것(STATE-01-02).
@@ -679,7 +679,7 @@ sequenceDiagram
 - [x] 마감 후에도 5초 간격으로 폴링을 계속한다. 탭이 숨겨지면 중지하고, 돌아오면 즉시 조회한다.
 - [x] 취소된 약속의 데이터는 삭제하지 않고 모두 보관
 - [x] TIME-10-04: "새로우면" → "다르면"
-- [x] TIME-10-03: "범위 변경으로 제출이 해제된 참여자는 다시 제출하기 전까지 미제출로 본다" 추가
+- [x] TIME-10-03: ~~"범위 변경으로 제출이 해제된 참여자는 다시 제출하기 전까지 미제출로 본다" 추가~~ → 2026-11-11 결정(X-07)으로 바뀜: 제출이 해제돼도 범위 안에 남은 슬롯은 계속 집계한다
 - [x] TIME-10-02 예시: "미응답으로 표시" → "불가능으로 표시"
 - [x] TIME-11-01: "재조율은 후속 범위다" 삭제
 - [x] STATE-06-02: "제출 취소" 삭제

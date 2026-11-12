@@ -477,12 +477,12 @@ Response Body
 
 ### 에러
 
-| HTTP 상태 | code                  | 발생 원인                               | message 예시                         |
-| --------- | --------------------- | --------------------------------------- | ------------------------------------ |
-| 401       | INVALID_CREDENTIALS   | 닉네임 없음 또는 PIN 불일치 (구분 없음) | 닉네임 또는 PIN이 올바르지 않습니다. |
-| 403       | PARTICIPANT_CANCELLED | 탈퇴했거나 내보내진 참여자              | 참여가 종료된 계정입니다.            |
-| 404       | PROMISE_NOT_FOUND     | 존재하지 않는 promiseId                 | 약속을 찾을 수 없습니다.             |
-| 409       | INVALID_PROMISE_STATE | cancelled 약속 (STATE-10-01)            | 취소된 약속입니다.                   |
+| HTTP 상태 | code                  | 발생 원인                                                                              | message 예시                         |
+| --------- | --------------------- | -------------------------------------------------------------------------------------- | ------------------------------------ |
+| 401       | INVALID_CREDENTIALS   | 닉네임 없음 또는 PIN 불일치 (구분 없음)                                                | 닉네임 또는 PIN이 올바르지 않습니다. |
+| 401       | UNAUTHENTICATED       | 탈퇴했거나 내보내진 참여자 (2026-11-11 결정, C-07: 403 `PARTICIPANT_CANCELLED`를 바꿈) | 이 약속에서 나갔거나 내보내졌어요.   |
+| 404       | PROMISE_NOT_FOUND     | 존재하지 않는 promiseId                                                                | 약속을 찾을 수 없습니다.             |
+| 409       | INVALID_PROMISE_STATE | cancelled 약속 (STATE-10-01)                                                           | 취소된 약속입니다.                   |
 
 ### 처리 순서 / 비고
 
@@ -492,7 +492,7 @@ Response Body
 2. `participants`에서 `(promise_id, normalized_nickname)`로 조회.
 3. 행이 없거나 PIN 해시 불일치면 **둘 다 동일하게 401 INVALID_CREDENTIALS**. 어느 쪽이 틀렸는지 구분해 알려주지 않는다 (ERD 9).
 4. 비교 실패·성공 모두 응답 시간을 비슷하게 유지한다(더미 해시 비교).
-5. `status = cancelled`이면 403 `PARTICIPANT_CANCELLED`.
+5. `status = cancelled`(탈퇴·내보내기)이면 401 `UNAUTHENTICATED` (2026-11-11 결정, C-07). 세션을 만들지 않는다.
 6. 새 세션 행을 생성하고 쿠키를 발급한다. 기존 기기의 세션은 그대로 둔다 (MEMBER-04-02).
 
 #### 마감 + 7일이 지난 뒤의 로그인
@@ -526,7 +526,7 @@ Response Body
 - 도메인: MEMBER
 - 관련 규칙: MEMBER-04-02, MEMBER-06-03, STATE-01-01, STATE-06-02
 - 권한: **본인 세션** 필요
-- 허용 상태: 전체 (cancelled 포함 — 취소 안내 화면에도 본인 정보가 필요). 단 **탈퇴한 본인은 세션이 삭제되므로 401**
+- 허용 상태: 전체 (cancelled 포함 — 취소 안내 화면에도 본인 정보가 필요). 단 **탈퇴한 본인은 세션이 즉시 만료되므로 401** (2026-11-11 결정, C-06)
 - 상태 전환: 없음
 - 동시성: 잠금 불필요 (읽기 전용)
 - TBD: 없음
@@ -609,18 +609,18 @@ Response Body
 
 ### 에러
 
-| HTTP 상태 | code              | 발생 원인                                                                | message 예시             |
-| --------- | ----------------- | ------------------------------------------------------------------------ | ------------------------ |
-| 401       | UNAUTHENTICATED   | 쿠키 없음·만료·해시 불일치, 또는 탈퇴·내보내기로 서버 세션이 삭제된 경우 | 로그인이 필요합니다.     |
-| 403       | FORBIDDEN         | 세션의 참여자가 이 약속 소속이 아님                                      | 접근 권한이 없습니다.    |
-| 404       | PROMISE_NOT_FOUND | 존재하지 않는 promiseId                                                  | 약속을 찾을 수 없습니다. |
+| HTTP 상태 | code              | 발생 원인                                                                     | message 예시             |
+| --------- | ----------------- | ----------------------------------------------------------------------------- | ------------------------ |
+| 401       | UNAUTHENTICATED   | 쿠키 없음·만료·해시 불일치, 또는 탈퇴·내보내기로 서버 세션이 즉시 만료된 경우 | 로그인이 필요합니다.     |
+| 403       | FORBIDDEN         | 세션의 참여자가 이 약속 소속이 아님                                           | 접근 권한이 없습니다.    |
+| 404       | PROMISE_NOT_FOUND | 존재하지 않는 promiseId                                                       | 약속을 찾을 수 없습니다. |
 
 ### 처리 순서 / 비고
 
 #### 보안 정보
 
 - 쿠키가 유효해도 **매 요청마다** 세션 만료, 참여자 status, 약속 상태를 다시 읽는다 (ERD 3.5).
-- **탈퇴·내보내기 시 서버 세션을 전부 삭제하므로(MEMBER-10-03, MEMBER-API-07) 브라우저에 쿠키가 남아 있어도 유효한 인증이 아니다. 탈퇴자의 `/me`는 401로 응답한다.** 탈퇴 완료 안내는 탈퇴 API의 응답과 화면에서 처리하고, `/me`가 탈퇴자를 조회해주는 경로는 두지 않는다.
+- **탈퇴·내보내기 시 서버 세션을 전부 즉시 만료하므로(행 삭제 없이 `expires_at`=현재 시각, MEMBER-10-03, ERD 6.2, 2026-11-11 결정 C-06) 브라우저에 쿠키가 남아 있어도 유효한 인증이 아니다. 탈퇴자의 `/me`는 401로 응답한다.** 탈퇴 완료 안내는 탈퇴 API의 응답과 화면에서 처리하고, `/me`가 탈퇴자를 조회해주는 경로는 두지 않는다.
 - 따라서 응답의 `status` 필드는 사실상 항상 active다. cancelled는 세션이 살아있는 경계 상황(예: 삭제 직전 동시 요청)에서만 잠시 나타나며, 그 경우에도 모든 permissions는 false다.
 - 다른 약속의 쿠키로 접근하는 것을 막기 위해 쿠키 Path를 약속별로 제한하고, 서버도 `participants.promise_id`와 경로의 promiseId를 대조한다.
 
@@ -793,7 +793,7 @@ Set-Cookie: ys_session_{promiseId}=; HttpOnly; Secure; SameSite=Lax;
 #### 보안 정보
 
 - 세션 행을 실제로 삭제한다. 쿠키만 지우고 서버 세션을 남기면 탈취된 토큰이 계속 유효해진다.
-- 참여자가 내보내지거나 탈퇴할 때는 서버가 해당 참여자의 세션을 **전부** 삭제한다 (ERD 3.5).
+- 참여자가 내보내지거나 탈퇴할 때는 서버가 해당 참여자의 세션을 **전부** 즉시 만료한다(행 삭제 없이 `expires_at`=현재 시각, ERD 6.2, 2026-11-11 결정 C-06). 로그아웃만 행을 삭제한다.
 - PIN 변경 시 기존 세션 폐기 정책은 **MEMBER-09-01 미정**이라 이번 범위에서 제외했다.
 
 ---
@@ -807,28 +807,45 @@ Set-Cookie: ys_session_{promiseId}=; HttpOnly; Secure; SameSite=Lax;
 ### 0. 규칙 연결
 
 - 도메인: MEMBER
-- 관련 규칙: MEMBER-10-03, MEMBER-11-02, STATE-06-01, ERD 6.2
+- 관련 규칙: MEMBER-10-02, MEMBER-10-03, MEMBER-11-02, STATE-06-01, ERD 6.2, ADR-0001
 - 권한: **해당 약속의 active 방장만**
-- 허용 상태: **collecting이고 현재 시각 < 마감일 때만.** draft·closed·confirmed·cancelled는 409
+- 허용 상태: **collecting이고 현재 시각 < 마감일 때만**(처음 모집·재조율 모두, 2026-11-11 결정 MEMBER-10-02). draft·closed·confirmed는 409 `INVALID_PROMISE_STATE`, cancelled는 409 `PROMISE_CANCELLED`(C-10)
 - 상태 전환: 약속 상태는 변하지 않음
 - 동시성: 필수. `promises` 행을 FOR UPDATE로 잠근 뒤 권한·상태·마감·대상을 재검사
 
 ### 1. 기본 정보
 
 - **목적:** 방장이 다른 참여자를 약속에서 제외한다. 데이터는 물리 삭제하지 않는다.
-- **Method:** DELETE
+- **HTTP Method:** DELETE
 - **Endpoint:** `/api/v1/promises/{promiseId}/participants/{participantId}`
-- **Authentication Required:** 예
+- **Authentication Required:** 예 (세션 쿠키)
+- **Content Type:** `application/json` (응답)
 
 ### 요청
 
-본문 없음.
+헤더
 
-대상은 경로의 `participantId`로만 지정
+| Name   | Value                      | 필수 |
+| ------ | -------------------------- | ---- |
+| Cookie | ys_session_{promiseId}=... | O    |
+| Origin | 서비스 도메인              | O    |
+
+Path 파라미터
+
+| 이름          | 타입          | 설명                                         | 필수 |
+| ------------- | ------------- | -------------------------------------------- | ---- |
+| promiseId     | string (uuid) | 약속 ID                                      | O    |
+| participantId | string (uuid) | 내보낼 참여자 ID. 대상은 이것으로만 지정한다 | O    |
+
+Request Body: 없음
 
 ### 응답
 
-Response Body (`200 OK`)
+#### Status Code: 200 OK
+
+대상이 이미 cancelled(탈퇴·내보내기)여도 데이터를 바꾸지 않고 같은 형태로 200을 반환한다(멱등).
+
+Response Body
 
 ```json
 {
@@ -843,14 +860,16 @@ Response Body (`200 OK`)
 
 요청이 실패하면 해당 **HTTP 상태 코드**와 함께 아래 형태의 JSON이 반환됩니다. error 필드는 상황에 따라 생략될 수 있습니다.
 
-| HTTP | 발생 원인                                                        | code                    |
-| ---- | ---------------------------------------------------------------- | ----------------------- |
-| 401  | 세션 없음·만료, 또는 요청자가 cancelled                          | `UNAUTHENTICATED`       |
-| 403  | 방장이 아님                                                      | `FORBIDDEN`             |
-| 404  | 대상이 없거나 다른 약속 소속                                     | `PARTICIPANT_NOT_FOUND` |
-| 409  | draft·closed·confirmed·cancelled에서의 요청. 재조율 후 처리 안내 | `INVALID_PROMISE_STATE` |
-| 409  | collecting이지만 마감 지남                                       | `DEADLINE_PASSED`       |
-| 409  | 방장이 자신을 지정. 탈퇴 API로 안내                              | `CANNOT_REMOVE_SELF`    |
+| HTTP 상태 | code                  | 발생 원인                                                                 | message 예시                                              |
+| --------- | --------------------- | ------------------------------------------------------------------------- | --------------------------------------------------------- |
+| 401       | UNAUTHENTICATED       | 세션 없음·만료, 또는 요청자가 cancelled                                   | 로그인이 필요합니다.                                      |
+| 403       | FORBIDDEN             | 방장이 아님                                                               | 방장만 내보낼 수 있습니다.                                |
+| 404       | PROMISE_NOT_FOUND     | 존재하지 않는 promiseId                                                   | 약속을 찾을 수 없습니다.                                  |
+| 404       | PARTICIPANT_NOT_FOUND | 대상이 없거나 다른 약속 소속                                              | 참여자를 찾을 수 없습니다.                                |
+| 409       | PROMISE_CANCELLED     | 취소된 약속. 인증보다 먼저 판정한다(C-10)                                 | 취소된 약속입니다.                                        |
+| 409       | INVALID_PROMISE_STATE | draft·closed·confirmed에서의 요청                                         | 모집 중에만 내보낼 수 있습니다.                           |
+| 409       | DEADLINE_PASSED       | collecting이지만 마감 지남. 잠금 뒤 closed로 바꾼 다음 거절한다(ADR-0001) | 응답 마감이 지났습니다.                                   |
+| 409       | CANNOT_REMOVE_SELF    | 방장이 자신을 지정. 나가기(STATE-API-08)로 안내                           | 방장은 스스로를 내보낼 수 없습니다. 탈퇴를 이용해 주세요. |
 
 ```json
 {
@@ -863,10 +882,12 @@ Response Body (`200 OK`)
 
 #### 처리 순서 (단일 트랜잭션)
 
+트랜잭션 전에 promiseId 형식과 약속 존재 여부를 확인한다. 없으면 404 `PROMISE_NOT_FOUND`, cancelled이면 세션 인증보다 먼저 409 `PROMISE_CANCELLED`(C-10). 그다음 세션을 인증하고, 없거나 만료면 401이다.
+
 1. `SELECT ... FROM promises WHERE id = $1 FOR UPDATE`
 2. 세션 참여자의 최신 `role = 'host'`, `status = 'active'` 재확인. 아니면 403
 3. 상태가 `collecting`이 아니면 409 `INVALID_PROMISE_STATE`
-4. 잠금 후 `clock_timestamp()`가 `voting_deadline_at` 이상이면 409 `DEADLINE_PASSED`
+4. 잠금 후 `clock_timestamp()`가 `voting_deadline_at` 이상이면 `promises.status = 'closed'`로 바꾸고(ADR-0001, 이 변경은 커밋한다) 409 `DEADLINE_PASSED`
 5. 대상이 같은 약속 소속인지 확인. 아니면 404
 6. 대상이 본인이면 409 `CANNOT_REMOVE_SELF`
 7. 대상이 이미 `cancelled`면 데이터를 바꾸지 않고 현재 상태를 200으로 반환 (멱등)

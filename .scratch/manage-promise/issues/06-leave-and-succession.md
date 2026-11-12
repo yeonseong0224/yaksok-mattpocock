@@ -12,7 +12,7 @@
 - [ ] 방장이 나가면 같은 트랜잭션에서 `created_at ASC, id ASC` 첫 active 참여자를 host로. 없으면 약속 취소(방장 행 host·active 유지). 응답에 결과(새 방장, `promise_cancelled`)
 - [ ] draft에서 방장이 나가면 약속·방장 행 삭제, 링크 처음 상태, `{"result":"draft_discarded"}`
 - [ ] 확정 후 탈퇴: 확정 시각 유지, 참석 명단만 갱신. 2명 미만이면 기존 `hostActionRequired` 안내
-- [ ] 탈퇴자의 재로그인은 401, 같은 닉네임 재참여는 기존처럼 거부
+- [ ] 탈퇴자의 재로그인은 401 `UNAUTHENTICATED`(member.md MEMBER-API-04, C-07). 지금 코드(`lib/members/errors.ts`, `session.test.ts`)는 403 `PARTICIPANT_CANCELLED`를 쓰니 함께 바꾼다. 같은 닉네임 재참여는 기존처럼 거부
 - [ ] 이전 방장이 승계 뒤 보낸 방장 요청은 잠금 뒤 role 재확인으로 403
 - [ ] 방장과 다음 순번이 동시에 나가도 약속 행 잠금으로 직렬화된다
 - [ ] 화면: 약속 정보에 "이 약속에서 나가기" + 확인(방장은 승계 대상 또는 "약속이 취소돼요" 표시). 설정 중 화면에 "이 약속 없애기". 나간 뒤 첫 화면으로. 브라우저에서 수동 확인
