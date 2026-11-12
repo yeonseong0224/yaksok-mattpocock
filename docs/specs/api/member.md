@@ -54,9 +54,9 @@
 - 헤더: 없음 (쿠키를 보내도 서버는 사용하지 않는다)
 - Path 파라미터
 
-| 이름 | 타입 | 설명 | 필수 |
-| --- | --- | --- | --- |
-| inviteToken | string | 초대 URL 토큰 | O |
+| 이름        | 타입   | 설명          | 필수 |
+| ----------- | ------ | ------------- | ---- |
+| inviteToken | string | 초대 URL 토큰 | O    |
 
 - Request Body: 없음
 
@@ -64,13 +64,13 @@
 
 #### Status Code: 200 OK
 
-| 이름 | 타입 | 설명 |
-| --- | --- | --- |
-| inviteToken | string | 요청한 토큰 |
-| promiseStatus | string | unclaimed / draft / collecting / closed / confirmed / cancelled. unclaimed는 아직 아무도 방장 등록을 하지 않은 상태 (STATE-02-01) |
-| promiseId | string 또는 null | 약속 UUID. unclaimed이면 null. **이 값으로 `/me`를 호출해 본인 여부를 판정한다** |
-| nextAction | string | 아래 「화면 분기」 표 참조 |
-| pollAfterMs | number 또는 null | draft일 때 재조회 권장 간격(ms). 그 외 null (MEMBER-03-02) |
+| 이름          | 타입             | 설명                                                                                                                              |
+| ------------- | ---------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| inviteToken   | string           | 요청한 토큰                                                                                                                       |
+| promiseStatus | string           | unclaimed / draft / collecting / closed / confirmed / cancelled. unclaimed는 아직 아무도 방장 등록을 하지 않은 상태 (STATE-02-01) |
+| promiseId     | string 또는 null | 약속 UUID. unclaimed이면 null. **이 값으로 `/me`를 호출해 본인 여부를 판정한다**                                                  |
+| nextAction    | string           | 아래 「화면 분기」 표 참조                                                                                                        |
+| pollAfterMs   | number 또는 null | draft일 때 재조회 권장 간격(ms). 그 외 null (MEMBER-03-02)                                                                        |
 
 **의도적으로 응답에 넣지 않는 값:** 약속 설정 일체(날짜·시간 범위, 소요 시간, 마감, 정원), 현재 참여 인원, 확정 시각, 참여자 명단, 본인 정보.
 
@@ -112,10 +112,10 @@ Response Body (아직 아무도 등록하지 않음)
 
 ### 에러
 
-| HTTP 상태 | code | 발생 원인 | message 예시 |
-| --- | --- | --- | --- |
-| 404 | LINK_NOT_FOUND | 존재하지 않는 초대 토큰 | 유효하지 않은 링크입니다. |
-| 410 | LINK_EXPIRED | 링크 발급 후 3개월 경과 (MEMBER-01-02) | 만료된 링크입니다. |
+| HTTP 상태 | code           | 발생 원인                              | message 예시              |
+| --------- | -------------- | -------------------------------------- | ------------------------- |
+| 404       | LINK_NOT_FOUND | 존재하지 않는 초대 토큰                | 유효하지 않은 링크입니다. |
+| 410       | LINK_EXPIRED   | 링크 발급 후 3개월 경과 (MEMBER-01-02) | 만료된 링크입니다.        |
 
 챗봇을 채팅방에서 제거해도 이 API는 계속 동작한다 (MEMBER-01-03). 챗봇 재추가는 **새 링크**를 발급하며 기존 링크도 그대로 유효하다 (MEMBER-01-04).
 
@@ -125,16 +125,16 @@ Response Body (아직 아무도 등록하지 않음)
 
 `nextAction`은 **비참여자 기준 기본값**이다. 클라이언트는 `/me` 호출 결과로 최종 화면을 정한다.
 
-| promiseStatus | nextAction | /me 결과 | 실제 화면 |
-| --- | --- | --- | --- |
-| unclaimed | register_host | 호출 불가(promiseId 없음) | 방장 등록 |
-| draft | wait_setup | 401 | 설정 중 대기 + 폴링 |
-| draft | wait_setup | 200, role=host | **방장 설정 이어서 하기** (draftExpiresAt까지 남은 시간 표시) |
-| collecting | join | 401 | 등록 또는 재인증 선택 — 약속 내용은 이 단계에서 보이지 않는다 |
-| collecting | join | 200, status=active | **본인 가능 시간 입력 화면** (설정 값은 여기서 처음 받는다) |
-| closed / confirmed | view_result | 401 | "참여자만 결과를 볼 수 있습니다" + 재인증 |
-| closed / confirmed | view_result | 200 | 결과 화면 (방장이면 확정·재조율 버튼) |
-| cancelled | cancelled | 무관 | 취소 안내 |
+| promiseStatus      | nextAction    | /me 결과                  | 실제 화면                                                     |
+| ------------------ | ------------- | ------------------------- | ------------------------------------------------------------- |
+| unclaimed          | register_host | 호출 불가(promiseId 없음) | 방장 등록                                                     |
+| draft              | wait_setup    | 401                       | 설정 중 대기 + 폴링                                           |
+| draft              | wait_setup    | 200, role=host            | **방장 설정 이어서 하기** (draftExpiresAt까지 남은 시간 표시) |
+| collecting         | join          | 401                       | 등록 또는 재인증 선택 — 약속 내용은 이 단계에서 보이지 않는다 |
+| collecting         | join          | 200, status=active        | **본인 가능 시간 입력 화면** (설정 값은 여기서 처음 받는다)   |
+| closed / confirmed | view_result   | 401                       | "참여자만 결과를 볼 수 있습니다" + 재인증                     |
+| closed / confirmed | view_result   | 200                       | 결과 화면 (방장이면 확정·재조율 버튼)                         |
+| cancelled          | cancelled     | 무관                      | 취소 안내                                                     |
 
 `nextAction` 허용값: `register_host` | `wait_setup` | `join` | `view_result` | `cancelled`
 
@@ -189,17 +189,17 @@ Response Body (아직 아무도 등록하지 않음)
 
 헤더
 
-| Name | Value | 필수 |
-| --- | --- | --- |
-| Content-Type | application/json | O |
-| Origin | 서비스 도메인 | O |
+| Name         | Value            | 필수 |
+| ------------ | ---------------- | ---- |
+| Content-Type | application/json | O    |
+| Origin       | 서비스 도메인    | O    |
 
 Request Body
 
-| 이름 | 타입 | 설명 | 필수 | 기본값 |
-| --- | --- | --- | --- | --- |
-| nickname | string | 표시용 닉네임. 앞뒤 공백 제거 후 2~12자 (MEMBER-05-01) | O | - |
-| pin | string | 숫자 4자리 (MEMBER-06-01). 원문은 저장하지 않는다 | O | - |
+| 이름     | 타입   | 설명                                                   | 필수 | 기본값 |
+| -------- | ------ | ------------------------------------------------------ | ---- | ------ |
+| nickname | string | 표시용 닉네임. 앞뒤 공백 제거 후 2~12자 (MEMBER-05-01) | O    | -      |
+| pin      | string | 숫자 4자리 (MEMBER-06-01). 원문은 저장하지 않는다      | O    | -      |
 
 요청 예시
 
@@ -209,26 +209,26 @@ Request Body
 
 #### 입력 검증
 
-| 항목 | 규칙 | 근거 |
-| --- | --- | --- |
-| 닉네임 길이 | trim 후 2자 이상 12자 이하 | MEMBER-05-01 |
-| 닉네임 이모지 | 첫 버전은 비허용(권장안). 글자 수 계산 기준 미정 | MEMBER-05-01 |
-| 닉네임 허용 문자 | 제한 없음 (모든 문자 허용) | MEMBER-05-02 |
-| 연속 공백 처리 | 그대로 저장(trim만 적용, 중간 공백 보존) | MEMBER-05-03 |
+| 항목               | 규칙                                                     | 근거         |
+| ------------------ | -------------------------------------------------------- | ------------ |
+| 닉네임 길이        | trim 후 2자 이상 12자 이하                               | MEMBER-05-01 |
+| 닉네임 이모지      | 첫 버전은 비허용(권장안). 글자 수 계산 기준 미정         | MEMBER-05-01 |
+| 닉네임 허용 문자   | 제한 없음 (모든 문자 허용)                               | MEMBER-05-02 |
+| 연속 공백 처리     | 그대로 저장(trim만 적용, 중간 공백 보존)                 | MEMBER-05-03 |
 | 대소문자 동일 취급 | 구분함 — normalized_nickname은 trim한 원문을 그대로 저장 | MEMBER-05-04 |
-| PIN | `^[0-9]{4}$` | MEMBER-06-01 |
+| PIN                | `^[0-9]{4}$`                                             | MEMBER-06-01 |
 
 ### 응답
 
 #### Status Code: 201 Created
 
-| 이름 | 타입 | 설명 |
-| --- | --- | --- |
-| promiseId | string (uuid) | 생성된 약속 ID. 이후 모든 요청 경로에 사용 |
-| participantId | string (uuid) | 방장 참여자 ID |
-| nickname | string | 정규화 전 표시용 닉네임 |
-| role | string | 항상 host |
-| promiseStatus | string | 항상 draft |
+| 이름           | 타입              | 설명                                                                                                   |
+| -------------- | ----------------- | ------------------------------------------------------------------------------------------------------ |
+| promiseId      | string (uuid)     | 생성된 약속 ID. 이후 모든 요청 경로에 사용                                                             |
+| participantId  | string (uuid)     | 방장 참여자 ID                                                                                         |
+| nickname       | string            | 정규화 전 표시용 닉네임                                                                                |
+| role           | string            | 항상 host                                                                                              |
+| promiseStatus  | string            | 항상 draft                                                                                             |
 | draftExpiresAt | string (ISO 8601) | promises.created_at + 10분. 이 시각까지 설정을 마치지 않으면 약속과 방장 기록이 삭제된다 (STATE-02-02) |
 
 응답 헤더
@@ -253,12 +253,12 @@ Response Body
 
 ### 에러
 
-| HTTP 상태 | code | 발생 원인 | message 예시 |
-| --- | --- | --- | --- |
-| 404 | LINK_NOT_FOUND | 존재하지 않는 토큰 | 유효하지 않은 링크입니다. |
-| 409 | HOST_ALREADY_REGISTERED | 이미 다른 사람이 선점 (MEMBER-02-01) | 이미 다른 분이 약속을 만들었습니다. 본인이 등록했다면 로그인해 주세요. |
-| 410 | LINK_EXPIRED | 링크 3개월 경과 | 만료된 링크입니다. |
-| 422 | VALIDATION_FAILED | 닉네임 길이 위반, PIN 형식 위반 | 닉네임은 2자 이상 12자 이하여야 합니다. |
+| HTTP 상태 | code                    | 발생 원인                            | message 예시                                                           |
+| --------- | ----------------------- | ------------------------------------ | ---------------------------------------------------------------------- |
+| 404       | LINK_NOT_FOUND          | 존재하지 않는 토큰                   | 유효하지 않은 링크입니다.                                              |
+| 409       | HOST_ALREADY_REGISTERED | 이미 다른 사람이 선점 (MEMBER-02-01) | 이미 다른 분이 약속을 만들었습니다. 본인이 등록했다면 로그인해 주세요. |
+| 410       | LINK_EXPIRED            | 링크 3개월 경과                      | 만료된 링크입니다.                                                     |
+| 422       | VALIDATION_FAILED       | 닉네임 길이 위반, PIN 형식 위반      | 닉네임은 2자 이상 12자 이하여야 합니다.                                |
 
 409를 받은 클라이언트는 **본인이 앞서 성공했는지 먼저 확인**해야 한다. 응답이 유실된 뒤 재시도한 경우에도 똑같은 409가 나기 때문이다 (MEMBER-API-00 6장).
 
@@ -331,10 +331,10 @@ Response Body
 - 헤더: `Content-Type: application/json`, `Origin` 필수
 - Request Body
 
-| 이름 | 타입 | 설명 | 필수 | 기본값 |
-| --- | --- | --- | --- | --- |
-| nickname | string | 2~12자. 같은 약속 안에서 중복 불가 (MEMBER-05-05) | O | - |
-| pin | string | 숫자 4자리 | O | - |
+| 이름     | 타입   | 설명                                              | 필수 | 기본값 |
+| -------- | ------ | ------------------------------------------------- | ---- | ------ |
+| nickname | string | 2~12자. 같은 약속 안에서 중복 불가 (MEMBER-05-05) | O    | -      |
+| pin      | string | 숫자 4자리                                        | O    | -      |
 
 요청 예시
 
@@ -346,15 +346,15 @@ Response Body
 
 #### Status Code: 201 Created
 
-| 이름 | 타입 | 설명 |
-| --- | --- | --- |
-| participantId | string (uuid) | 생성된 참여자 ID |
-| nickname | string | 표시용 닉네임 |
-| role | string | 항상 member |
-| status | string | 항상 active |
-| availabilitySubmittedAt | null | 등록 직후에는 미제출 |
-| currentParticipantCount | number | 등록 후 active 참여자 수 (방장·미제출자 포함, 탈퇴자 제외 — MEMBER-07-02) |
-| participantLimit | number | 방장 포함 정원 |
+| 이름                    | 타입          | 설명                                                                      |
+| ----------------------- | ------------- | ------------------------------------------------------------------------- |
+| participantId           | string (uuid) | 생성된 참여자 ID                                                          |
+| nickname                | string        | 표시용 닉네임                                                             |
+| role                    | string        | 항상 member                                                               |
+| status                  | string        | 항상 active                                                               |
+| availabilitySubmittedAt | null          | 등록 직후에는 미제출                                                      |
+| currentParticipantCount | number        | 등록 후 active 참여자 수 (방장·미제출자 포함, 탈퇴자 제외 — MEMBER-07-02) |
+| participantLimit        | number        | 방장 포함 정원                                                            |
 
 응답 헤더: `Set-Cookie: ys_session_{promiseId}=...` (MEMBER-API-00 쿠키 규약 동일)
 
@@ -374,15 +374,15 @@ Response Body
 
 ### 에러
 
-| HTTP 상태 | code | 발생 원인 | message 예시 |
-| --- | --- | --- | --- |
-| 404 | PROMISE_NOT_FOUND | 존재하지 않는 promiseId | 약속을 찾을 수 없습니다. |
-| 409 | PROMISE_NOT_OPEN | draft — 방장이 아직 설정 중 (MEMBER-03-02) | 방장이 약속을 설정 중입니다. |
-| 409 | INVALID_PROMISE_STATE | closed·confirmed·cancelled에서의 신규 참여. 방장이 재조율을 시작하고 정원을 늘려야 허용된다 (STATE-06-01) | 마감된 약속에는 참여할 수 없습니다. |
-| 409 | DEADLINE_PASSED | 상태는 collecting이지만 마감 시각을 지남 | 응답 마감이 지났습니다. |
-| 409 | PROMISE_FULL | active 참여자 수가 정원에 도달 | 참여 정원이 모두 찼습니다. |
-| 409 | NICKNAME_TAKEN | 같은 약속에 동일 정규화 닉네임 존재. 탈퇴·내보내진 행도 포함한다 (MEMBER-05-05, 05-06, 11-01, 11-02) | 이미 사용 중인 닉네임입니다. 본인이 등록했다면 로그인해 주세요. |
-| 422 | VALIDATION_FAILED | 닉네임·PIN 형식 위반 | PIN은 숫자 4자리여야 합니다. |
+| HTTP 상태 | code                  | 발생 원인                                                                                                 | message 예시                                                    |
+| --------- | --------------------- | --------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| 404       | PROMISE_NOT_FOUND     | 존재하지 않는 promiseId                                                                                   | 약속을 찾을 수 없습니다.                                        |
+| 409       | PROMISE_NOT_OPEN      | draft — 방장이 아직 설정 중 (MEMBER-03-02)                                                                | 방장이 약속을 설정 중입니다.                                    |
+| 409       | INVALID_PROMISE_STATE | closed·confirmed·cancelled에서의 신규 참여. 방장이 재조율을 시작하고 정원을 늘려야 허용된다 (STATE-06-01) | 마감된 약속에는 참여할 수 없습니다.                             |
+| 409       | DEADLINE_PASSED       | 상태는 collecting이지만 마감 시각을 지남                                                                  | 응답 마감이 지났습니다.                                         |
+| 409       | PROMISE_FULL          | active 참여자 수가 정원에 도달                                                                            | 참여 정원이 모두 찼습니다.                                      |
+| 409       | NICKNAME_TAKEN        | 같은 약속에 동일 정규화 닉네임 존재. 탈퇴·내보내진 행도 포함한다 (MEMBER-05-05, 05-06, 11-01, 11-02)      | 이미 사용 중인 닉네임입니다. 본인이 등록했다면 로그인해 주세요. |
+| 422       | VALIDATION_FAILED     | 닉네임·PIN 형식 위반                                                                                      | PIN은 숫자 4자리여야 합니다.                                    |
 
 ### 처리 순서 / 비고
 
@@ -436,10 +436,10 @@ Response Body
 - 헤더: `Content-Type: application/json`, `Origin` 필수
 - Request Body
 
-| 이름 | 타입 | 설명 | 필수 |
-| --- | --- | --- | --- |
-| nickname | string | 등록 때와 동일한 정규화 규칙을 적용해 조회한다 | O |
-| pin | string | 숫자 4자리 | O |
+| 이름     | 타입   | 설명                                           | 필수 |
+| -------- | ------ | ---------------------------------------------- | ---- |
+| nickname | string | 등록 때와 동일한 정규화 규칙을 적용해 조회한다 | O    |
+| pin      | string | 숫자 4자리                                     | O    |
 
 요청 예시
 
@@ -451,14 +451,14 @@ Response Body
 
 #### Status Code: 200 OK
 
-| 이름 | 타입 | 설명 |
-| --- | --- | --- |
-| participantId | string (uuid) | 본인 참여자 ID |
-| nickname | string | 표시용 닉네임 |
-| role | string | host \| member |
-| status | string | active \| cancelled |
-| promiseStatus | string | 로그인 직후 클라이언트가 화면을 고를 수 있도록 함께 반환 |
-| sessionExpiresAt | string (ISO 8601) | 세션 만료 시각. 마감 + 7일 (MEMBER-06-03) |
+| 이름             | 타입              | 설명                                                     |
+| ---------------- | ----------------- | -------------------------------------------------------- |
+| participantId    | string (uuid)     | 본인 참여자 ID                                           |
+| nickname         | string            | 표시용 닉네임                                            |
+| role             | string            | host \| member                                           |
+| status           | string            | active \| cancelled                                      |
+| promiseStatus    | string            | 로그인 직후 클라이언트가 화면을 고를 수 있도록 함께 반환 |
+| sessionExpiresAt | string (ISO 8601) | 세션 만료 시각. 마감 + 7일 (MEMBER-06-03)                |
 
 응답 헤더: `Set-Cookie: ys_session_{promiseId}=...`
 
@@ -477,12 +477,12 @@ Response Body
 
 ### 에러
 
-| HTTP 상태 | code | 발생 원인 | message 예시 |
-| --- | --- | --- | --- |
-| 401 | INVALID_CREDENTIALS | 닉네임 없음 또는 PIN 불일치 (구분 없음) | 닉네임 또는 PIN이 올바르지 않습니다. |
-| 403 | PARTICIPANT_CANCELLED | 탈퇴했거나 내보내진 참여자 | 참여가 종료된 계정입니다. |
-| 404 | PROMISE_NOT_FOUND | 존재하지 않는 promiseId | 약속을 찾을 수 없습니다. |
-| 409 | INVALID_PROMISE_STATE | cancelled 약속 (STATE-10-01) | 취소된 약속입니다. |
+| HTTP 상태 | code                  | 발생 원인                               | message 예시                         |
+| --------- | --------------------- | --------------------------------------- | ------------------------------------ |
+| 401       | INVALID_CREDENTIALS   | 닉네임 없음 또는 PIN 불일치 (구분 없음) | 닉네임 또는 PIN이 올바르지 않습니다. |
+| 403       | PARTICIPANT_CANCELLED | 탈퇴했거나 내보내진 참여자              | 참여가 종료된 계정입니다.            |
+| 404       | PROMISE_NOT_FOUND     | 존재하지 않는 promiseId                 | 약속을 찾을 수 없습니다.             |
+| 409       | INVALID_PROMISE_STATE | cancelled 약속 (STATE-10-01)            | 취소된 약속입니다.                   |
 
 ### 처리 순서 / 비고
 
@@ -543,9 +543,9 @@ Response Body
 
 헤더
 
-| Name | Value | 필수 |
-| --- | --- | --- |
-| Cookie | ys_session_{promiseId}=... | O |
+| Name   | Value                      | 필수 |
+| ------ | -------------------------- | ---- |
+| Cookie | ys_session_{promiseId}=... | O    |
 
 Request Body: 없음
 
@@ -553,17 +553,17 @@ Request Body: 없음
 
 #### Status Code: 200 OK
 
-| 이름 | 타입 | 설명 |
-| --- | --- | --- |
-| participantId | string (uuid) | 본인 참여자 ID |
-| nickname | string | 표시용 닉네임 |
-| role | string | host \| member. **클라이언트는 이 값을 표시용으로만 쓴다.** 권한 판정은 항상 서버가 다시 한다 |
-| status | string | active \| cancelled |
-| availabilitySubmittedAt | string \| null | 제출 완료 시각. null이면 미제출 (ERD 3.3) |
-| promiseStatus | string | draft \| collecting \| closed \| confirmed \| cancelled |
-| deadlinePassed | boolean | 서버 현재 시각 기준 마감 경과 여부. 상태가 아직 collecting이더라도 true일 수 있다 (TIME-15-04) |
-| permissions | object | 화면 제어용 헌트. canEditAvailability / canSubmit / canManagePromise / canLeave |
-| sessionExpiresAt | string (ISO 8601) | 현재 세션 만료 시각 |
+| 이름                    | 타입              | 설명                                                                                           |
+| ----------------------- | ----------------- | ---------------------------------------------------------------------------------------------- |
+| participantId           | string (uuid)     | 본인 참여자 ID                                                                                 |
+| nickname                | string            | 표시용 닉네임                                                                                  |
+| role                    | string            | host \| member. **클라이언트는 이 값을 표시용으로만 쓴다.** 권한 판정은 항상 서버가 다시 한다  |
+| status                  | string            | active \| cancelled                                                                            |
+| availabilitySubmittedAt | string \| null    | 제출 완료 시각. null이면 미제출 (ERD 3.3)                                                      |
+| promiseStatus           | string            | draft \| collecting \| closed \| confirmed \| cancelled                                        |
+| deadlinePassed          | boolean           | 서버 현재 시각 기준 마감 경과 여부. 상태가 아직 collecting이더라도 true일 수 있다 (TIME-15-04) |
+| permissions             | object            | 화면 제어용 헌트. canEditAvailability / canSubmit / canManagePromise / canLeave                |
+| sessionExpiresAt        | string (ISO 8601) | 현재 세션 만료 시각                                                                            |
 
 Response Body
 
@@ -588,12 +588,12 @@ Response Body
 
 #### permissions 산정 규칙
 
-| 헌트 | true 조건 | 근거 |
-| --- | --- | --- |
-| canEditAvailability | status=active 그리고 promiseStatus=collecting 그리고 마감 전 | STATE-06-02 |
-| canSubmit | canEditAvailability와 동일 | STATE-06-02 |
-| canManagePromise | role=host 그리고 status=active 그리고 promiseStatus≠cancelled | STATE-10-01 |
-| canLeave | status=active 그리고 promiseStatus≠cancelled. 마감 후에도 본인 탈퇴는 가능하며, 방장도 true (자동 승계 후 탈퇴) | STATE-06-01, MEMBER-12-01, MEMBER-12-03 |
+| 헌트                | true 조건                                                                                                       | 근거                                    |
+| ------------------- | --------------------------------------------------------------------------------------------------------------- | --------------------------------------- |
+| canEditAvailability | status=active 그리고 promiseStatus=collecting 그리고 마감 전                                                    | STATE-06-02                             |
+| canSubmit           | canEditAvailability와 동일                                                                                      | STATE-06-02                             |
+| canManagePromise    | role=host 그리고 status=active 그리고 promiseStatus≠cancelled                                                   | STATE-10-01                             |
+| canLeave            | status=active 그리고 promiseStatus≠cancelled. 마감 후에도 본인 탈퇴는 가능하며, 방장도 true (자동 승계 후 탈퇴) | STATE-06-01, MEMBER-12-01, MEMBER-12-03 |
 
 **방장도 `canLeave`는 true다.** 방장이 탈퇴하면 방장 권한은 **방장을 제외한 active 참여자 중 `participants.created_at`이 가장 이른 사람에게 자동으로 넘어간 뒤** 탈퇴가 처리된다 (MEMBER-12-01, MEMBER-12-03). 방장이 대상을 직접 고르지 않으므로 **수동 위임 API는 만들지 않는다.**
 
@@ -609,11 +609,11 @@ Response Body
 
 ### 에러
 
-| HTTP 상태 | code | 발생 원인 | message 예시 |
-| --- | --- | --- | --- |
-| 401 | UNAUTHENTICATED | 쿠키 없음·만료·해시 불일치, 또는 탈퇴·내보내기로 서버 세션이 삭제된 경우 | 로그인이 필요합니다. |
-| 403 | FORBIDDEN | 세션의 참여자가 이 약속 소속이 아님 | 접근 권한이 없습니다. |
-| 404 | PROMISE_NOT_FOUND | 존재하지 않는 promiseId | 약속을 찾을 수 없습니다. |
+| HTTP 상태 | code              | 발생 원인                                                                | message 예시             |
+| --------- | ----------------- | ------------------------------------------------------------------------ | ------------------------ |
+| 401       | UNAUTHENTICATED   | 쿠키 없음·만료·해시 불일치, 또는 탈퇴·내보내기로 서버 세션이 삭제된 경우 | 로그인이 필요합니다.     |
+| 403       | FORBIDDEN         | 세션의 참여자가 이 약속 소속이 아님                                      | 접근 권한이 없습니다.    |
+| 404       | PROMISE_NOT_FOUND | 존재하지 않는 promiseId                                                  | 약속을 찾을 수 없습니다. |
 
 ### 처리 순서 / 비고
 
@@ -660,9 +660,9 @@ Response Body
 
 헤더
 
-| Name | Value | 필수 |
-| --- | --- | --- |
-| Cookie | ys_session_{promiseId}=... | O |
+| Name   | Value                      | 필수 |
+| ------ | -------------------------- | ---- |
+| Cookie | ys_session_{promiseId}=... | O    |
 
 - Query 파라미터: 없음
 - Request Body: 없음
@@ -671,15 +671,15 @@ Response Body
 
 #### Status Code: 200 OK
 
-| 이름 | 타입 | 설명 |
-| --- | --- | --- |
-| participantLimit | number | 방장 포함 정원 (ERD promises.participant_limit) |
-| currentParticipantCount | number | active 참여자 수. 방장·미제출자 포함, 탈퇴·내보내진 사람 제외 (MEMBER-07-02). `participants` 배열 길이와 항상 같다 |
-| participants | array | 등록순(created_at 오름차순). active만 포함 |
-| participants[].participantId | string (uuid) | 참여자 ID |
-| participants[].nickname | string | 표시용 닉네임 |
-| participants[].role | string | host 또는 member |
-| participants[].isMe | boolean | 요청한 본인 여부 |
+| 이름                         | 타입          | 설명                                                                                                               |
+| ---------------------------- | ------------- | ------------------------------------------------------------------------------------------------------------------ |
+| participantLimit             | number        | 방장 포함 정원 (ERD promises.participant_limit)                                                                    |
+| currentParticipantCount      | number        | active 참여자 수. 방장·미제출자 포함, 탈퇴·내보내진 사람 제외 (MEMBER-07-02). `participants` 배열 길이와 항상 같다 |
+| participants                 | array         | 등록순(created_at 오름차순). active만 포함                                                                         |
+| participants[].participantId | string (uuid) | 참여자 ID                                                                                                          |
+| participants[].nickname      | string        | 표시용 닉네임                                                                                                      |
+| participants[].role          | string        | host 또는 member                                                                                                   |
+| participants[].isMe          | boolean       | 요청한 본인 여부                                                                                                   |
 
 **응답에 포함하지 않는 값**
 
@@ -694,8 +694,8 @@ Response Body
   "participantLimit": 6,
   "currentParticipantCount": 4,
   "participants": [
-    { "participantId": "b9a4c7e1-...", "nickname": "승주", "role": "host",   "isMe": false },
-    { "participantId": "2d81c6b7-...", "nickname": "혜승", "role": "member", "isMe": true  },
+    { "participantId": "b9a4c7e1-...", "nickname": "승주", "role": "host", "isMe": false },
+    { "participantId": "2d81c6b7-...", "nickname": "혜승", "role": "member", "isMe": true },
     { "participantId": "7f20a3dd-...", "nickname": "철수", "role": "member", "isMe": false },
     { "participantId": "c4e9b812-...", "nickname": "영희", "role": "member", "isMe": false }
   ]
@@ -704,12 +704,12 @@ Response Body
 
 ### 에러
 
-| HTTP 상태 | code | 발생 원인 | message 예시 |
-| --- | --- | --- | --- |
-| 401 | UNAUTHENTICATED | 등록하지 않은 사람의 요청, 또는 탈퇴로 세션이 즉시 만료된 경우 (MEMBER-08-01) | 참여 등록 후 볼 수 있습니다. |
-| 403 | FORBIDDEN | draft 상태 — 방장 외에는 명단·정원을 보여주지 않는다 (MEMBER-03-01) | 방장이 약속을 설정 중입니다. |
-| 404 | PROMISE_NOT_FOUND | 존재하지 않는 promiseId | 약속을 찾을 수 없습니다. |
-| 409 | INVALID_PROMISE_STATE | cancelled 약속 (STATE-10-01) | 취소된 약속입니다. |
+| HTTP 상태 | code                  | 발생 원인                                                                     | message 예시                 |
+| --------- | --------------------- | ----------------------------------------------------------------------------- | ---------------------------- |
+| 401       | UNAUTHENTICATED       | 등록하지 않은 사람의 요청, 또는 탈퇴로 세션이 즉시 만료된 경우 (MEMBER-08-01) | 참여 등록 후 볼 수 있습니다. |
+| 403       | FORBIDDEN             | draft 상태 — 방장 외에는 명단·정원을 보여주지 않는다 (MEMBER-03-01)           | 방장이 약속을 설정 중입니다. |
+| 404       | PROMISE_NOT_FOUND     | 존재하지 않는 promiseId                                                       | 약속을 찾을 수 없습니다.     |
+| 409       | INVALID_PROMISE_STATE | cancelled 약속 (STATE-10-01)                                                  | 취소된 약속입니다.           |
 
 ### 처리 순서 / 비고
 
@@ -751,16 +751,16 @@ Response Body
 
 헤더
 
-| Name | Value | 필수 |
-| --- | --- | --- |
-| Cookie | ys_session_{promiseId}=... | O |
-| Origin | 서비스 도메인 | O |
+| Name   | Value                      | 필수 |
+| ------ | -------------------------- | ---- |
+| Cookie | ys_session_{promiseId}=... | O    |
+| Origin | 서비스 도메인              | O    |
 
 Query 파라미터
 
-| 이름 | 타입 | 설명 | 필수 | 기본값 |
-| --- | --- | --- | --- | --- |
-| allDevices | boolean | true면 해당 참여자의 모든 세션을 삭제한다 (ERD 3.5 전체 로그아웃) | X | false |
+| 이름       | 타입    | 설명                                                              | 필수 | 기본값 |
+| ---------- | ------- | ----------------------------------------------------------------- | ---- | ------ |
+| allDevices | boolean | true면 해당 참여자의 모든 세션을 삭제한다 (ERD 3.5 전체 로그아웃) | X    | false  |
 
 Request Body: 없음
 
@@ -777,10 +777,10 @@ Set-Cookie: ys_session_{promiseId}=; HttpOnly; Secure; SameSite=Lax;
 
 ### 에러
 
-| HTTP 상태 | code | 발생 원인 | message 예시 |
-| --- | --- | --- | --- |
-| 401 | UNAUTHENTICATED | 쿠키가 아예 없는 경우. 이미 만료된 쿠키는 204로 처리한다 | 로그인 상태가 아닙니다. |
-| 404 | PROMISE_NOT_FOUND | 존재하지 않는 promiseId | 약속을 찾을 수 없습니다. |
+| HTTP 상태 | code              | 발생 원인                                                | message 예시             |
+| --------- | ----------------- | -------------------------------------------------------- | ------------------------ |
+| 401       | UNAUTHENTICATED   | 쿠키가 아예 없는 경우. 이미 만료된 쿠키는 204로 처리한다 | 로그인 상태가 아닙니다.  |
+| 404       | PROMISE_NOT_FOUND | 존재하지 않는 promiseId                                  | 약속을 찾을 수 없습니다. |
 
 ### 처리 순서 / 비고
 
@@ -843,14 +843,14 @@ Response Body (`200 OK`)
 
 요청이 실패하면 해당 **HTTP 상태 코드**와 함께 아래 형태의 JSON이 반환됩니다. error 필드는 상황에 따라 생략될 수 있습니다.
 
-| HTTP | 발생 원인 | code |
-| --- | --- | --- |
-| 401 | 세션 없음·만료, 또는 요청자가 cancelled | `UNAUTHENTICATED` |
-| 403 | 방장이 아님 | `FORBIDDEN` |
-| 404 | 대상이 없거나 다른 약속 소속 | `PARTICIPANT_NOT_FOUND` |
-| 409 | draft·closed·confirmed·cancelled에서의 요청. 재조율 후 처리 안내 | `INVALID_PROMISE_STATE` |
-| 409 | collecting이지만 마감 지남 | `DEADLINE_PASSED` |
-| 409 | 방장이 자신을 지정. 탈퇴 API로 안내 | `CANNOT_REMOVE_SELF` |
+| HTTP | 발생 원인                                                        | code                    |
+| ---- | ---------------------------------------------------------------- | ----------------------- |
+| 401  | 세션 없음·만료, 또는 요청자가 cancelled                          | `UNAUTHENTICATED`       |
+| 403  | 방장이 아님                                                      | `FORBIDDEN`             |
+| 404  | 대상이 없거나 다른 약속 소속                                     | `PARTICIPANT_NOT_FOUND` |
+| 409  | draft·closed·confirmed·cancelled에서의 요청. 재조율 후 처리 안내 | `INVALID_PROMISE_STATE` |
+| 409  | collecting이지만 마감 지남                                       | `DEADLINE_PASSED`       |
+| 409  | 방장이 자신을 지정. 탈퇴 API로 안내                              | `CANNOT_REMOVE_SELF`    |
 
 ```json
 {
