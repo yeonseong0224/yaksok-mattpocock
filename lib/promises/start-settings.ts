@@ -38,7 +38,12 @@ export type StartSettings = {
 };
 
 export type SettingsField = "title" | "participantLimit" | "dateRange" | "votingDeadlineAt";
-export type SettingsError = { field: SettingsField; message: string };
+export type SettingsError = {
+  field: SettingsField;
+  message: string;
+  /** 따로 구분해 응답해야 하는 오류의 코드(그 밖에는 VALIDATION_ERROR) */
+  code?: "CAPACITY_BELOW_ACTIVE_COUNT";
+};
 
 export type StartSettingsResult =
   { ok: true; settings: StartSettings } | { ok: false; errors: SettingsError[] };
@@ -54,7 +59,14 @@ export function parseStartSettingsBody(body: Record<string, unknown>): StartSett
   return { title, participantLimit, dateRange: { startDate, endDate }, votingDeadlineAt };
 }
 
-export function validateStartSettings(input: StartSettingsInput, now: Date): StartSettingsResult {
+export function validateStartSettings(
+  input: StartSettingsInput,
+  now: Date,
+  options: {
+    /** 재설정·재조율: 이미 지난 기존 시작일은 그대로 둘 수 있다(2026-11-11 결정). 새로 고르는 시작일은 오늘부터 */
+    keptStartDate?: string;
+  } = {},
+): StartSettingsResult {
   const errors: SettingsError[] = [];
 
   const title = input.title.trim();
@@ -79,7 +91,7 @@ export function validateStartSettings(input: StartSettingsInput, now: Date): Sta
   }
 
   const { startDate, endDate } = input.dateRange;
-  const rangeError = dateRangeError(startDate, endDate, now);
+  const rangeError = dateRangeError(startDate, endDate, now, options.keptStartDate);
   if (rangeError) errors.push({ field: "dateRange", message: rangeError });
 
   const deadline = parseDeadline(input.votingDeadlineAt);
@@ -104,19 +116,34 @@ export function validateStartSettings(input: StartSettingsInput, now: Date): Sta
   };
 }
 
-/** 달력에서 시작일로 고를 수 있는 날짜인가(오늘 이후, TIME-04-01) */
-export function canStartOn(date: string, now: Date): boolean {
-  return isDateString(date) && date >= kstDate(now);
+/**
+ * 달력에서 시작일로 고를 수 있는 날짜인가(오늘 이후, TIME-04-01).
+ * 재설정·재조율에서는 이미 지난 기존 시작일(keptStartDate)도 고를 수 있다.
+ */
+export function canStartOn(date: string, now: Date, keptStartDate?: string): boolean {
+  return isDateString(date) && (date >= kstDate(now) || date === keptStartDate);
 }
 
 /** 시작일을 고른 뒤 종료일로 고를 수 있는 날짜인가. 모집 시작 검증과 같은 규칙이다. */
-export function canEndOn(startDate: string, date: string, now: Date): boolean {
-  return dateRangeError(startDate, date, now) === null;
+export function canEndOn(
+  startDate: string,
+  date: string,
+  now: Date,
+  keptStartDate?: string,
+): boolean {
+  return dateRangeError(startDate, date, now, keptStartDate) === null;
 }
 
-function dateRangeError(startDate: string, endDate: string, now: Date): string | null {
+function dateRangeError(
+  startDate: string,
+  endDate: string,
+  now: Date,
+  keptStartDate?: string,
+): string | null {
   if (!isDateString(startDate) || !isDateString(endDate)) return "날짜를 다시 골라 주세요.";
-  if (startDate < kstDate(now)) return "시작일은 오늘 이후로 골라 주세요.";
+  if (startDate < kstDate(now) && startDate !== keptStartDate) {
+    return "시작일은 오늘 이후로 골라 주세요.";
+  }
   if (endDate < startDate) return "종료일은 시작일보다 앞설 수 없어요.";
   if (endDate > addDays(startDate, DATE_RANGE_MAX_DAYS - 1)) {
     return `날짜 범위는 최대 ${DATE_RANGE_MAX_DAYS}일까지 고를 수 있어요.`;

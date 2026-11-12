@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  canEndOn,
+  canStartOn,
   defaultVotingDeadline,
   validateStartSettings,
   type StartSettingsInput,
@@ -201,5 +203,18 @@ describe("마감 기본값", () => {
       now,
     );
     expect(result.ok).toBe(true);
+  });
+});
+
+describe("달력에서 고를 수 있는 날짜(재설정·재조율)", () => {
+  // 오늘 11-10. 이미 시작한 약속의 기존 시작일 11-08
+  it("이미 지난 기존 시작일은 시작일로 다시 고를 수 있고, 그 기준으로 종료일도 고를 수 있다", () => {
+    expect(canStartOn("2026-11-08", NOW, "2026-11-08")).toBe(true);
+    expect(canEndOn("2026-11-08", "2026-11-20", NOW, "2026-11-08")).toBe(true);
+  });
+
+  it("그 밖의 지난 날짜는 고를 수 없다", () => {
+    expect(canStartOn("2026-11-09", NOW, "2026-11-08")).toBe(false);
+    expect(canStartOn("2026-11-08", NOW)).toBe(false);
   });
 });
