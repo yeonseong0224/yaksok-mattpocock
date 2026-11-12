@@ -20,6 +20,7 @@ export function CandidateListPanel({
   onPick,
   onConfirm,
   onReopen,
+  onCancelPromise,
 }: {
   promiseId: string;
   pollMs: number;
@@ -29,6 +30,8 @@ export function CandidateListPanel({
   onConfirm?: (candidate: ScheduledTime) => void;
   /** 방장·마감 후에만 넘긴다. 후보가 없을 때 다시 조율하기를 바로 고를 수 있다(RESULT-08-02). */
   onReopen?: (opener: HTMLElement) => void;
+  /** 방장·마감 후에만 넘긴다. 후보가 없을 때 약속 취소도 바로 고를 수 있다(RESULT-08-02). */
+  onCancelPromise?: (opener: HTMLElement) => void;
 }) {
   const result = useSWR<CandidateList, ApiError>(candidatesUrl(promiseId), getJson, {
     refreshInterval: pollMs,
@@ -59,7 +62,7 @@ export function CandidateListPanel({
           <p>2명 이상 겹치는 시간이 없어요.</p>
           {onReopen && data.promiseStatus !== "collecting" && (
             <div className="mt-3 flex flex-wrap items-center gap-2">
-              <span>새 마감을 정해 다시 조율해 보세요.</span>
+              <span>새 마감을 정해 다시 조율하거나 약속을 취소할 수 있어요.</span>
               <Button
                 variant="secondary"
                 onClick={(e) => onReopen(e.currentTarget)}
@@ -67,6 +70,15 @@ export function CandidateListPanel({
               >
                 다시 조율하기
               </Button>
+              {onCancelPromise && (
+                <button
+                  type="button"
+                  onClick={(e) => onCancelPromise(e.currentTarget)}
+                  className="px-2 text-sm text-danger underline-offset-2 hover:underline"
+                >
+                  약속 취소
+                </button>
+              )}
             </div>
           )}
         </div>

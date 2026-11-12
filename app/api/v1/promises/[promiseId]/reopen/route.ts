@@ -76,19 +76,15 @@ export async function POST(
     const status = effectiveStatus(promise);
     if (status !== "closed" && status !== "confirmed") return { kind: "wrong_state", status };
 
-    const applied = await applySettingsChange(
-      tx,
-      promise,
-      {
-        title: input.title ?? promise.title!,
-        participantLimit: input.participantLimit ?? promise.participantLimit!,
-        dateRange: input.dateRange ?? {
-          startDate: promise.dateRangeStart!,
-          endDate: promise.dateRangeEnd!,
-        },
-        votingDeadlineAt: input.votingDeadlineAt,
+    const applied = await applySettingsChange(tx, promise, {
+      title: input.title ?? promise.title!,
+      participantLimit: input.participantLimit ?? promise.participantLimit!,
+      dateRange: input.dateRange ?? {
+        startDate: promise.dateRangeStart!,
+        endDate: promise.dateRangeEnd!,
       },
-    );
+      votingDeadlineAt: input.votingDeadlineAt,
+    });
     if (!applied.ok) return { kind: "invalid", errors: applied.errors };
     // 다시 모집 중으로 돌리고 확정 일정을 비운다(STATE-API-06 처리 순서 3·8).
     await tx.promise.update({

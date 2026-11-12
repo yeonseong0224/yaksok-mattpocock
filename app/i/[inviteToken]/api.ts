@@ -40,12 +40,19 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * 약속이 취소됐다는 응답(409 PROMISE_CANCELLED)을 받으면 화면 전체에 알린다. 폴링이든 버튼이든
+ * 어느 요청에서 알게 돼도 링크 화면이 링크를 다시 읽어 "취소된 약속"으로 바뀐다(약속 관리 티켓 05).
+ */
+export const PROMISE_CANCELLED_EVENT = "yaksok:promise-cancelled";
+
 async function toApiError(res: Response): Promise<ApiError> {
   const body = (await res.json().catch(() => null)) as {
     code?: string;
     message?: string;
     details?: Record<string, unknown>;
   } | null;
+  if (body?.code === "PROMISE_CANCELLED") window.dispatchEvent(new Event(PROMISE_CANCELLED_EVENT));
   return new ApiError(
     res.status,
     body?.code,
@@ -170,6 +177,7 @@ export type CandidateList = {
 
 export const candidatesUrl = (promiseId: string) => `${promiseUrl(promiseId)}/candidates`;
 export const closeUrl = (promiseId: string) => `${promiseUrl(promiseId)}/close`;
+export const cancelUrl = (promiseId: string) => `${promiseUrl(promiseId)}/cancel`;
 
 /** 후보·확정 일정 하나(시작·끝, 참석 가능한 사람) */
 export type ScheduledTime = {

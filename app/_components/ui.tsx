@@ -46,19 +46,24 @@ export function CardText({ children }: { children: ReactNode }) {
 }
 
 type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
-  variant?: "primary" | "secondary";
+  variant?: ButtonVariant;
+};
+
+/** danger는 되돌릴 수 없는 동작(약속 취소)에만 쓴다. */
+type ButtonVariant = "primary" | "secondary" | "danger";
+
+const VARIANT_CLASS: Record<ButtonVariant, string> = {
+  primary: "bg-brand text-white hover:bg-brand-strong disabled:bg-brand/50",
+  secondary: "border border-line bg-surface text-brand-ink hover:bg-canvas disabled:text-muted",
+  danger: "bg-danger text-white hover:bg-danger/90 disabled:bg-danger/50",
 };
 
 const BUTTON_BASE =
   "flex h-11 w-full items-center justify-center rounded-lg text-sm font-medium transition-colors disabled:cursor-not-allowed";
 
 /** 버튼 모양. 링크(<Link>)를 버튼처럼 보이게 할 때도 쓴다. */
-export const buttonClass = (variant: "primary" | "secondary" = "primary") =>
-  `${BUTTON_BASE} ${
-    variant === "primary"
-      ? "bg-brand text-white hover:bg-brand-strong disabled:bg-brand/50"
-      : "border border-line bg-surface text-brand-ink hover:bg-canvas disabled:text-muted"
-  }`;
+export const buttonClass = (variant: ButtonVariant = "primary") =>
+  `${BUTTON_BASE} ${VARIANT_CLASS[variant]}`;
 
 export function Button({ variant = "primary", className = "", ...props }: ButtonProps) {
   return <button className={`${buttonClass(variant)} ${className}`} {...props} />;
