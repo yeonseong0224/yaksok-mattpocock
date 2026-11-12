@@ -41,34 +41,30 @@
 
 **헤더**
 
-| Name | Value | 필수 |
-| --- | --- | --- |
-| Cookie | `ys_session_{promiseId}=...` | O |
-| Content-Type | `application/json` | O |
+| Name         | Value                        | 필수 |
+| ------------ | ---------------------------- | ---- |
+| Cookie       | `ys_session_{promiseId}=...` | O    |
+| Content-Type | `application/json`           | O    |
 
 **Path 파라미터**
 
-| 이름 | 타입 | 설명 | 필수 |
-| --- | --- | --- | --- |
-| promiseId | string (UUID) | 약속 ID | O |
+| 이름      | 타입          | 설명    | 필수 |
+| --------- | ------------- | ------- | ---- |
+| promiseId | string (UUID) | 약속 ID | O    |
 
 **Request Body**
 
-| 이름 | 타입 | 설명 | 필수 |
-| --- | --- | --- | --- |
-| baseVersion | integer (≥ 0) | 브라우저가 마지막으로 받은 내 `availability_version`. TIME-API-02의 `me.version` 값 | O |
-| slots | string[] | 30분 슬롯 시작 시각 목록. ISO-8601, `+09:00` 필수, 분은 00 또는 30, 초는 0. 0개 이상 5,000개 이하 | O |
+| 이름        | 타입          | 설명                                                                                              | 필수 |
+| ----------- | ------------- | ------------------------------------------------------------------------------------------------- | ---- |
+| baseVersion | integer (≥ 0) | 브라우저가 마지막으로 받은 내 `availability_version`. TIME-API-02의 `me.version` 값               | O    |
+| slots       | string[]      | 30분 슬롯 시작 시각 목록. ISO-8601, `+09:00` 필수, 분은 00 또는 30, 초는 0. 0개 이상 5,000개 이하 | O    |
 
 같은 시각이 여러 번 오면 하나로 합치며, 합쳐진 것은 제외 개수에 넣지 않는다. participantId는 받지 않고 대상 참여자는 세션으로만 결정한다.
 
 ```json
 {
   "baseVersion": 3,
-  "slots": [
-    "2026-10-28T14:00:00+09:00",
-    "2026-10-28T14:30:00+09:00",
-    "2026-10-29T10:00:00+09:00"
-  ]
+  "slots": ["2026-10-28T14:00:00+09:00", "2026-10-28T14:30:00+09:00", "2026-10-29T10:00:00+09:00"]
 }
 ```
 
@@ -76,23 +72,20 @@
 
 **Status Code: 200 OK**
 
-| 이름 | 타입 | 설명 |
-| --- | --- | --- |
-| version | integer | 저장 후 새 버전. 브라우저는 이 값을 다음 baseVersion으로 쓴다 |
-| submitted | boolean | 항상 true |
-| submittedAt | string (ISO-8601, 밀리초 3자리) | 제출 시각 |
-| slots | string[] | 저장 후 서버에 있는 내 슬롯 전체(그대로 둔 지난 슬롯 포함). 시각 오름차순 |
-| droppedSlotCount | integer | 날짜·하루 시간 범위 밖이라 저장하지 않은 슬롯 수(지난 슬롯은 세지 않음) |
+| 이름             | 타입                            | 설명                                                                      |
+| ---------------- | ------------------------------- | ------------------------------------------------------------------------- |
+| version          | integer                         | 저장 후 새 버전. 브라우저는 이 값을 다음 baseVersion으로 쓴다             |
+| submitted        | boolean                         | 항상 true                                                                 |
+| submittedAt      | string (ISO-8601, 밀리초 3자리) | 제출 시각                                                                 |
+| slots            | string[]                        | 저장 후 서버에 있는 내 슬롯 전체(그대로 둔 지난 슬롯 포함). 시각 오름차순 |
+| droppedSlotCount | integer                         | 날짜·하루 시간 범위 밖이라 저장하지 않은 슬롯 수(지난 슬롯은 세지 않음)   |
 
 ```json
 {
   "version": 4,
   "submitted": true,
   "submittedAt": "2026-10-27T18:35:10.027+09:00",
-  "slots": [
-    "2026-10-28T14:00:00+09:00",
-    "2026-10-28T14:30:00+09:00"
-  ],
+  "slots": ["2026-10-28T14:00:00+09:00", "2026-10-28T14:30:00+09:00"],
   "droppedSlotCount": 1
 }
 ```
@@ -103,17 +96,17 @@
 
 형식: `{"error":{"code","message","details"}}`
 
-| HTTP 상태 | code | 발생 원인 | message 예시 |
-| --- | --- | --- | --- |
-| 401 | `UNAUTHENTICATED` | 세션 쿠키 없음·만료, 탈퇴·내보내진 참여자, 다른 약속의 세션 (ERD 11절) | 다시 로그인해 주세요. |
-| 404 | `PROMISE_NOT_FOUND` | 없는 약속 | 약속을 찾을 수 없습니다. |
-| 409 | `PROMISE_NOT_COLLECTING` | draft(방장 설정 중) | 아직 시간을 입력할 수 없습니다. |
-| 409 | `VOTING_CLOSED` | 마감·확정됨 (마감 시각에 막 도달한 경우 포함) | 응답이 마감되었습니다. |
-| 409 | `PROMISE_CANCELLED` | 취소된 약속 | 취소된 약속입니다. |
-| 409 | `AVAILABILITY_VERSION_CONFLICT` | baseVersion ≠ 현재 버전. details: `{ "currentVersion": 5, "submitted": true, "slots": ["2026-10-28T14:00:00.000+09:00"] }` | 다른 기기에서 먼저 저장했어요. 최신 내용을 확인해 주세요. |
-| 422 | `INVALID_REQUEST_BODY` | baseVersion·slots 누락, 타입 오류 | 요청 형식이 올바르지 않습니다. |
-| 422 | `INVALID_SLOT_FORMAT` | +09:00 아님, 분이 00·30 아님, 초가 0 아님, 존재하지 않는 날짜 | 시간 형식이 올바르지 않습니다. |
-| 422 | `SLOT_LIMIT_EXCEEDED` **[제안]** | 원본 slots 5,000개 초과 (제외·중복 정리 전 개수 기준) | 한 번에 저장할 수 있는 시간은 5,000칸까지입니다. |
+| HTTP 상태 | code                             | 발생 원인                                                                                                                  | message 예시                                              |
+| --------- | -------------------------------- | -------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
+| 401       | `UNAUTHENTICATED`                | 세션 쿠키 없음·만료, 탈퇴·내보내진 참여자, 다른 약속의 세션 (ERD 11절)                                                     | 다시 로그인해 주세요.                                     |
+| 404       | `PROMISE_NOT_FOUND`              | 없는 약속                                                                                                                  | 약속을 찾을 수 없습니다.                                  |
+| 409       | `PROMISE_NOT_COLLECTING`         | draft(방장 설정 중)                                                                                                        | 아직 시간을 입력할 수 없습니다.                           |
+| 409       | `VOTING_CLOSED`                  | 마감·확정됨 (마감 시각에 막 도달한 경우 포함)                                                                              | 응답이 마감되었습니다.                                    |
+| 409       | `PROMISE_CANCELLED`              | 취소된 약속                                                                                                                | 취소된 약속입니다.                                        |
+| 409       | `AVAILABILITY_VERSION_CONFLICT`  | baseVersion ≠ 현재 버전. details: `{ "currentVersion": 5, "submitted": true, "slots": ["2026-10-28T14:00:00.000+09:00"] }` | 다른 기기에서 먼저 저장했어요. 최신 내용을 확인해 주세요. |
+| 422       | `INVALID_REQUEST_BODY`           | baseVersion·slots 누락, 타입 오류                                                                                          | 요청 형식이 올바르지 않습니다.                            |
+| 422       | `INVALID_SLOT_FORMAT`            | +09:00 아님, 분이 00·30 아님, 초가 0 아님, 존재하지 않는 날짜                                                              | 시간 형식이 올바르지 않습니다.                            |
+| 422       | `SLOT_LIMIT_EXCEEDED` **[제안]** | 원본 slots 5,000개 초과 (제외·중복 정리 전 개수 기준)                                                                      | 한 번에 저장할 수 있는 시간은 5,000칸까지입니다.          |
 
 409 AVAILABILITY_VERSION_CONFLICT를 받으면 브라우저는 로컬 입력을 폐기하고 "다른 기기에서 먼저 저장했어요"를 안내한 뒤, details의 최신 값(currentVersion·submitted·slots)으로 화면을 다시 그린다. 다시 조회할 필요가 없다(TIME-10-04, ERD 8.2).
 
@@ -137,7 +130,7 @@
 // app/api/v1/promises/[promiseId]/me/availability/route.ts
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { requireSession } from "@/lib/session";   // MEMBER-API-00
+import { requireSession } from "@/lib/session"; // MEMBER-API-00
 import { apiError } from "@/lib/api-error";
 
 const KST = 9 * 60 * 60 * 1000;
@@ -145,17 +138,25 @@ const SLOT_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:(00|30):00(\.000)?\+09:00$/;
 const Body = z.object({ baseVersion: z.number().int().min(0), slots: z.array(z.string()) });
 const toKstIso = (ms: number) => new Date(ms + KST).toISOString().replace("Z", "+09:00");
 
-type PromiseRow = { status: string; dateStart: string; dateEnd: string;
-  dailyStart: number; dailyEnd: number; deadline: Date }; // 하루 경계는 분 단위
+type PromiseRow = {
+  status: string;
+  dateStart: string;
+  dateEnd: string;
+  dailyStart: number;
+  dailyEnd: number;
+  deadline: Date;
+}; // 하루 경계는 분 단위
 
 export async function PUT(req: Request, { params }: { params: Promise<{ promiseId: string }> }) {
   const { promiseId } = await params;
   const session = await requireSession(req, promiseId); // 실패 시 401 응답을 던짐
 
   const parsed = Body.safeParse(await req.json().catch(() => null));
-  if (!parsed.success) return apiError(422, "INVALID_REQUEST_BODY", "요청 형식이 올바르지 않습니다.");
+  if (!parsed.success)
+    return apiError(422, "INVALID_REQUEST_BODY", "요청 형식이 올바르지 않습니다.");
   const { baseVersion, slots } = parsed.data;
-  if (slots.length > 5000) return apiError(422, "SLOT_LIMIT_EXCEEDED", "한 번에 저장할 수 있는 시간은 5,000칸까지입니다.");
+  if (slots.length > 5000)
+    return apiError(422, "SLOT_LIMIT_EXCEEDED", "한 번에 저장할 수 있는 시간은 5,000칸까지입니다.");
   if (!slots.every((s) => SLOT_RE.test(s) && !Number.isNaN(Date.parse(s))))
     return apiError(422, "INVALID_SLOT_FORMAT", "시간 형식이 올바르지 않습니다.");
   const unique = [...new Set(slots.map((s) => Date.parse(s)))];
@@ -181,37 +182,54 @@ export async function PUT(req: Request, { params }: { params: Promise<{ promiseI
 
     const me = await tx.participant.findUnique({
       where: { id: session.participantId },
-      select: { promiseId: true, status: true, availabilityVersion: true, availabilitySubmittedAt: true },
+      select: {
+        promiseId: true,
+        status: true,
+        availabilityVersion: true,
+        availabilitySubmittedAt: true,
+      },
     });
     if (!me || me.promiseId !== promiseId || me.status !== "active")
       return { error: "UNAUTHENTICATED" as const }; // 탈퇴·내보내기 포함 (ERD 11절)
-    const start = p.dailyStart, end = p.dailyEnd; // 분 값 그대로 사용
+    const start = p.dailyStart,
+      end = p.dailyEnd; // 분 값 그대로 사용
     const future = unique.filter((ms) => ms > now.getTime()); // 지난 슬롯은 무시 (10/27 확정)
     const kept = future
       .filter((ms) => {
         const k = new Date(ms + KST).toISOString(); // 한국 시각 기준 문자열
         const day = k.slice(0, 10);
         const min = Number(k.slice(11, 13)) * 60 + Number(k.slice(14, 16));
-        return day >= p.dateStart && day <= p.dateEnd
-          && min >= start && min + 30 <= end;
+        return day >= p.dateStart && day <= p.dateEnd && min >= start && min + 30 <= end;
       })
       .sort((a, b) => a - b);
 
     if (me.availabilityVersion !== baseVersion) {
       const cur = await tx.participantAvailableSlot.findMany({
         where: { participantId: session.participantId },
-        orderBy: { slotStartAt: "asc" }, select: { slotStartAt: true },
+        orderBy: { slotStartAt: "asc" },
+        select: { slotStartAt: true },
       });
       const curMs = cur.map((s) => s.slotStartAt.getTime());
       const curFuture = curMs.filter((ms) => ms > now.getTime());
-      const sameAsSaved = me.availabilitySubmittedAt !== null
-        && curFuture.length === kept.length && curFuture.every((v, i) => v === kept[i]);
-      if (sameAsSaved) // 이미 저장된 요청의 재시도 → 바꾸지 않고 성공 처리 (ERD 8.2)
-        return { ok: true as const, version: me.availabilityVersion,
-                 now: me.availabilitySubmittedAt!, saved: curMs, dropped: future.length - kept.length };
-      return { error: "AVAILABILITY_VERSION_CONFLICT" as const, currentVersion: me.availabilityVersion,
-               submitted: me.availabilitySubmittedAt !== null,
-               slots: curMs.map((ms) => toKstIso(ms)) };
+      const sameAsSaved =
+        me.availabilitySubmittedAt !== null &&
+        curFuture.length === kept.length &&
+        curFuture.every((v, i) => v === kept[i]);
+      if (sameAsSaved)
+        // 이미 저장된 요청의 재시도 → 바꾸지 않고 성공 처리 (ERD 8.2)
+        return {
+          ok: true as const,
+          version: me.availabilityVersion,
+          now: me.availabilitySubmittedAt!,
+          saved: curMs,
+          dropped: future.length - kept.length,
+        };
+      return {
+        error: "AVAILABILITY_VERSION_CONFLICT" as const,
+        currentVersion: me.availabilityVersion,
+        submitted: me.availabilitySubmittedAt !== null,
+        slots: curMs.map((ms) => toKstIso(ms)),
+      };
     }
 
     await tx.participantAvailableSlot.deleteMany({
@@ -219,7 +237,10 @@ export async function PUT(req: Request, { params }: { params: Promise<{ promiseI
     });
     if (kept.length > 0) {
       await tx.participantAvailableSlot.createMany({
-        data: kept.map((ms) => ({ participantId: session.participantId, slotStartAt: new Date(ms) })),
+        data: kept.map((ms) => ({
+          participantId: session.participantId,
+          slotStartAt: new Date(ms),
+        })),
       });
     }
     const updated = await tx.participant.update({
@@ -229,10 +250,16 @@ export async function PUT(req: Request, { params }: { params: Promise<{ promiseI
     });
     const saved = await tx.participantAvailableSlot.findMany({
       where: { participantId: session.participantId },
-      orderBy: { slotStartAt: "asc" }, select: { slotStartAt: true },
+      orderBy: { slotStartAt: "asc" },
+      select: { slotStartAt: true },
     });
-    return { ok: true as const, version: updated.availabilityVersion, now,
-             saved: saved.map((s) => s.slotStartAt.getTime()), dropped: future.length - kept.length };
+    return {
+      ok: true as const,
+      version: updated.availabilityVersion,
+      now,
+      saved: saved.map((s) => s.slotStartAt.getTime()),
+      dropped: future.length - kept.length,
+    };
   });
 
   if ("error" in r) {
@@ -242,11 +269,16 @@ export async function PUT(req: Request, { params }: { params: Promise<{ promiseI
       PROMISE_NOT_COLLECTING: [409, "아직 시간을 입력할 수 없습니다."],
       VOTING_CLOSED: [409, "응답이 마감되었습니다."],
       UNAUTHENTICATED: [401, "다시 로그인해 주세요."],
-      AVAILABILITY_VERSION_CONFLICT: [409, "다른 기기에서 먼저 저장했어요. 최신 내용을 확인해 주세요."],
+      AVAILABILITY_VERSION_CONFLICT: [
+        409,
+        "다른 기기에서 먼저 저장했어요. 최신 내용을 확인해 주세요.",
+      ],
     } as const;
     const [status, message] = map[r.error];
-    const details = r.error === "AVAILABILITY_VERSION_CONFLICT"
-      ? { currentVersion: r.currentVersion, submitted: r.submitted, slots: r.slots } : {};
+    const details =
+      r.error === "AVAILABILITY_VERSION_CONFLICT"
+        ? { currentVersion: r.currentVersion, submitted: r.submitted, slots: r.slots }
+        : {};
     return apiError(status, r.error, message, details);
   }
 
@@ -304,15 +336,15 @@ export async function PUT(req: Request, { params }: { params: Promise<{ promiseI
 
 **헤더**
 
-| Name | Value | 필수 |
-| --- | --- | --- |
-| Cookie | `ys_session_{promiseId}=...` | O |
+| Name   | Value                        | 필수 |
+| ------ | ---------------------------- | ---- |
+| Cookie | `ys_session_{promiseId}=...` | O    |
 
 **Path 파라미터**
 
-| 이름 | 타입 | 설명 | 필수 |
-| --- | --- | --- | --- |
-| promiseId | string (UUID) | 약속 ID | O |
+| 이름      | 타입          | 설명    | 필수 |
+| --------- | ------------- | ------- | ---- |
+| promiseId | string (UUID) | 약속 ID | O    |
 
 **Request Body:** 없음
 
@@ -320,26 +352,26 @@ export async function PUT(req: Request, { params }: { params: Promise<{ promiseI
 
 **Status Code: 200 OK**
 
-| 이름 | 타입 | 설명 |
-| --- | --- | --- |
-| status | string | effectiveStatus. collecting / closed / confirmed. DB가 collecting이어도 현재 시각 ≥ 마감이면 closed |
-| serverTime **[제안]** | string (ISO-8601, 밀리초 3자리) | 조회 기준 서버 시각. 남은 시간 표시와 지난 슬롯 회색 처리에 기기 시계 대신 사용(TIME-15-03) |
-| settings.dateRangeStart / dateRangeEnd | string (YYYY-MM-DD) | 선택 가능 날짜 범위(양끝 포함, 한국 날짜) |
-| settings.dailyStartTime / dailyEndTime | string ("HH:mm") | 하루 선택 가능 시각 경계. 종료는 "24:00" 가능 |
-| settings.durationMinutes | integer | 약속 소요 시간(30의 배수) |
-| settings.votingDeadlineAt | string (ISO-8601) | 응답 마감 시각 |
-| totalParticipants | integer | active 참여자 전체 수. 가능 인원 표시의 분모 |
-| participants[] | array | active 참여자 목록. 등록순 |
-| participants[].participantId | string (UUID) | 참여자 ID |
-| participants[].nickname | string | 표시 이름 |
-| participants[].isHost | boolean | 방장 여부(표시용) |
-| participants[].availableSlots | string[] | 제출 완료자만 저장된 슬롯을 담는다. 미제출·제출 해제·빈 선택 제출은 모두 []. 시각 오름차순 |
-| me.participantId | string (UUID) | 내 참여자 ID |
-| me.version | integer | 내 availability_version. TIME-API-01의 baseVersion으로 쓴다 |
-| me.submitted | boolean | 내 제출 여부. 제출 해제 상태면 false |
-| me.slots | string[] | 서버에 저장된 내 슬롯. 제출 해제 상태에서도 그대로 보여줘 확인 후 다시 제출할 수 있게 한다 |
+| 이름                                   | 타입                            | 설명                                                                                                                                                                                      |
+| -------------------------------------- | ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| status                                 | string                          | effectiveStatus. collecting / closed / confirmed. DB가 collecting이어도 현재 시각 ≥ 마감이면 closed                                                                                       |
+| serverTime **[제안]**                  | string (ISO-8601, 밀리초 3자리) | 조회 기준 서버 시각. 남은 시간 표시와 지난 슬롯 회색 처리에 기기 시계 대신 사용(TIME-15-03)                                                                                               |
+| settings.dateRangeStart / dateRangeEnd | string (YYYY-MM-DD)             | 선택 가능 날짜 범위(양끝 포함, 한국 날짜)                                                                                                                                                 |
+| settings.dailyStartTime / dailyEndTime | string ("HH:mm")                | 하루 선택 가능 시각 경계. 종료는 "24:00" 가능                                                                                                                                             |
+| settings.durationMinutes               | integer                         | 약속 소요 시간(30의 배수)                                                                                                                                                                 |
+| settings.votingDeadlineAt              | string (ISO-8601)               | 응답 마감 시각                                                                                                                                                                            |
+| totalParticipants                      | integer                         | active 참여자 전체 수. 가능 인원 표시의 분모                                                                                                                                              |
+| participants[]                         | array                           | active 참여자 목록. 등록순                                                                                                                                                                |
+| participants[].participantId           | string (UUID)                   | 참여자 ID                                                                                                                                                                                 |
+| participants[].nickname                | string                          | 표시 이름                                                                                                                                                                                 |
+| participants[].isHost                  | boolean                         | 방장 여부(표시용)                                                                                                                                                                         |
+| participants[].availableSlots          | string[]                        | 서버에 저장된(제출된) 슬롯을 담는다. 범위 확대로 제출이 해제된 참여자도 범위 안에 남은 슬롯을 담는다(2026-11-11 결정, X-07). 한 번도 제출하지 않았거나 빈 선택 제출이면 []. 시각 오름차순 |
+| me.participantId                       | string (UUID)                   | 내 참여자 ID                                                                                                                                                                              |
+| me.version                             | integer                         | 내 availability_version. TIME-API-01의 baseVersion으로 쓴다                                                                                                                               |
+| me.submitted                           | boolean                         | 내 제출 여부. 제출 해제 상태면 false                                                                                                                                                      |
+| me.slots                               | string[]                        | 서버에 저장된 내 슬롯. 제출 해제 상태에서도 그대로 보여줘 확인 후 다시 제출할 수 있게 한다                                                                                                |
 
-participants[] 안의 내 항목은 다른 사람과 같은 규칙을 따른다. 그래서 제출 해제 상태면 내 항목의 availableSlots는 []이고, me.slots에는 저장된 슬롯이 남아 있다. 지난 시각 슬롯도 저장된 그대로 내려주며, 화면에서 serverTime 기준으로 지난 칸을 구분한다.
+participants[] 안의 내 항목은 다른 사람과 같은 규칙을 따른다. 제출 해제 상태여도 내 항목의 availableSlots와 me.slots에는 저장된 슬롯이 그대로 있다(2026-11-11 결정, X-07). 지난 시각 슬롯도 저장된 그대로 내려주며, 화면에서 serverTime 기준으로 지난 칸을 구분한다.
 
 ```json
 {
@@ -387,12 +419,12 @@ participants[] 안의 내 항목은 다른 사람과 같은 규칙을 따른다.
 
 형식: `{"error":{"code","message","details"}}`
 
-| HTTP 상태 | code | 발생 원인 | message 예시 |
-| --- | --- | --- | --- |
-| 401 | `UNAUTHENTICATED` | 세션 쿠키 없음·만료, 탈퇴·내보내진 참여자, 다른 약속의 세션 (ERD 11절) | 다시 로그인해 주세요. |
-| 404 | `PROMISE_NOT_FOUND` | 없는 약속 | 약속을 찾을 수 없습니다. |
-| 409 | `PROMISE_NOT_COLLECTING` | draft(방장 설정 중) | 방장이 약속을 설정 중입니다. |
-| 409 | `PROMISE_CANCELLED` | 취소된 약속. 데이터는 보관하지만 내용은 보여주지 않는다 | 취소된 약속입니다. |
+| HTTP 상태 | code                     | 발생 원인                                                              | message 예시                 |
+| --------- | ------------------------ | ---------------------------------------------------------------------- | ---------------------------- |
+| 401       | `UNAUTHENTICATED`        | 세션 쿠키 없음·만료, 탈퇴·내보내진 참여자, 다른 약속의 세션 (ERD 11절) | 다시 로그인해 주세요.        |
+| 404       | `PROMISE_NOT_FOUND`      | 없는 약속                                                              | 약속을 찾을 수 없습니다.     |
+| 409       | `PROMISE_NOT_COLLECTING` | draft(방장 설정 중)                                                    | 방장이 약속을 설정 중입니다. |
+| 409       | `PROMISE_CANCELLED`      | 취소된 약속. 데이터는 보관하지만 내용은 보여주지 않는다                | 취소된 약속입니다.           |
 
 #### 처리 순서
 
@@ -401,7 +433,7 @@ participants[] 안의 내 항목은 다른 사람과 같은 규칙을 따른다.
 3. promises 행을 읽는다. 없으면 404. 하루 경계는 분 값(`daily_start_minute`·`daily_end_minute`)으로 읽어 응답에서 "HH:mm"으로 바꾼다(1440 → "24:00").
 4. effectiveStatus를 계산한다. cancelled는 409 PROMISE_CANCELLED, draft는 409 PROMISE_NOT_COLLECTING. collecting이면서 현재 시각 ≥ 마감이면 closed로 계산만 하고 DB는 바꾸지 않는다.
 5. 세션의 참여자가 이 약속 소속이고 active인지 확인한다. 아니면 401 UNAUTHENTICATED(탈퇴·내보내기 포함, ERD 11절).
-6. active 참여자와 그 슬롯을 읽는다. 제출 시각이 있는 참여자만 availableSlots에 슬롯을 담고, 나머지는 []로 둔다.
+6. active 참여자와 그 슬롯을 읽어 availableSlots에 담는다. 제출 해제 상태여도 저장된 슬롯을 담는다(2026-11-11 결정, X-07).
 7. 내 version·제출 여부·저장 슬롯으로 me를 만든다.
 8. `Cache-Control: no-store`로 200을 반환한다.
 
@@ -415,46 +447,61 @@ participants[] 안의 내 항목은 다른 사람과 같은 규칙을 따른다.
 // app/api/v1/promises/[promiseId]/availability/route.ts
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { requireSession } from "@/lib/session";   // MEMBER-API-00
+import { requireSession } from "@/lib/session"; // MEMBER-API-00
 import { apiError } from "@/lib/api-error";
 
 const KST = 9 * 60 * 60 * 1000;
 const toKstIso = (d: Date) => new Date(d.getTime() + KST).toISOString().replace("Z", "+09:00");
-const toHHmm = (m: number) => // 540 → "09:00", 1440 → "24:00"
+const toHHmm = (m: number) =>
+  // 540 → "09:00", 1440 → "24:00"
   `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
 
-type PromiseRow = { status: string; dateStart: string; dateEnd: string; dailyStart: number;
-  dailyEnd: number; durationMinutes: number; deadline: Date; now: Date }; // 하루 경계는 분 단위
+type PromiseRow = {
+  status: string;
+  dateStart: string;
+  dateEnd: string;
+  dailyStart: number;
+  dailyEnd: number;
+  durationMinutes: number;
+  deadline: Date;
+  now: Date;
+}; // 하루 경계는 분 단위
 
 export async function GET(req: Request, { params }: { params: Promise<{ promiseId: string }> }) {
   const { promiseId } = await params;
   const session = await requireSession(req, promiseId); // 실패 시 401 응답을 던짐
 
-  const r = await prisma.$transaction(async (tx) => {
-    const [p] = await tx.$queryRaw<PromiseRow[]>`
+  const r = await prisma.$transaction(
+    async (tx) => {
+      const [p] = await tx.$queryRaw<PromiseRow[]>`
       SELECT status, date_range_start::text AS "dateStart", date_range_end::text AS "dateEnd",
              daily_start_minute AS "dailyStart", daily_end_minute AS "dailyEnd",
              duration_minutes AS "durationMinutes", voting_deadline_at AS "deadline", now() AS "now"
       FROM promises WHERE id = ${promiseId}::uuid`;
-    if (!p) return { error: "PROMISE_NOT_FOUND" as const };
-    if (p.status === "cancelled") return { error: "PROMISE_CANCELLED" as const };
-    if (p.status === "draft") return { error: "PROMISE_NOT_COLLECTING" as const };
-    const status = p.status === "collecting" && p.now >= p.deadline ? "closed" : p.status;
+      if (!p) return { error: "PROMISE_NOT_FOUND" as const };
+      if (p.status === "cancelled") return { error: "PROMISE_CANCELLED" as const };
+      if (p.status === "draft") return { error: "PROMISE_NOT_COLLECTING" as const };
+      const status = p.status === "collecting" && p.now >= p.deadline ? "closed" : p.status;
 
-    const people = await tx.participant.findMany({
-      where: { promiseId, status: "active" },
-      orderBy: { createdAt: "asc" },
-      select: {
-        id: true, nickname: true, role: true,
-        availabilitySubmittedAt: true, availabilityVersion: true,
-        availableSlots: { select: { slotStartAt: true }, orderBy: { slotStartAt: "asc" } },
-      },
-    });
-    const me = people.find((x) => x.id === session.participantId);
-    if (!me) return { error: "UNAUTHENTICATED" as const }; // 탈퇴·내보내기 포함 (ERD 11절)
+      const people = await tx.participant.findMany({
+        where: { promiseId, status: "active" },
+        orderBy: { createdAt: "asc" },
+        select: {
+          id: true,
+          nickname: true,
+          role: true,
+          availabilitySubmittedAt: true,
+          availabilityVersion: true,
+          availableSlots: { select: { slotStartAt: true }, orderBy: { slotStartAt: "asc" } },
+        },
+      });
+      const me = people.find((x) => x.id === session.participantId);
+      if (!me) return { error: "UNAUTHENTICATED" as const }; // 탈퇴·내보내기 포함 (ERD 11절)
 
-    return { ok: true as const, p, status, people, me };
-  }, { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead });
+      return { ok: true as const, p, status, people, me };
+    },
+    { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead },
+  );
 
   if ("error" in r) {
     const map = {
@@ -468,30 +515,37 @@ export async function GET(req: Request, { params }: { params: Promise<{ promiseI
   }
 
   const { p, status, people, me } = r;
-  const slotsOf = (x: (typeof people)[number]) => x.availableSlots.map((s) => toKstIso(s.slotStartAt));
+  const slotsOf = (x: (typeof people)[number]) =>
+    x.availableSlots.map((s) => toKstIso(s.slotStartAt));
 
-  return Response.json({
-    status,
-    serverTime: toKstIso(p.now),
-    settings: {
-      dateRangeStart: p.dateStart, dateRangeEnd: p.dateEnd,
-      dailyStartTime: toHHmm(p.dailyStart), dailyEndTime: toHHmm(p.dailyEnd),
-      durationMinutes: p.durationMinutes, votingDeadlineAt: toKstIso(p.deadline),
+  return Response.json(
+    {
+      status,
+      serverTime: toKstIso(p.now),
+      settings: {
+        dateRangeStart: p.dateStart,
+        dateRangeEnd: p.dateEnd,
+        dailyStartTime: toHHmm(p.dailyStart),
+        dailyEndTime: toHHmm(p.dailyEnd),
+        durationMinutes: p.durationMinutes,
+        votingDeadlineAt: toKstIso(p.deadline),
+      },
+      totalParticipants: people.length,
+      participants: people.map((x) => ({
+        participantId: x.id,
+        nickname: x.nickname,
+        isHost: x.role === "host",
+        availableSlots: slotsOf(x), // 제출 해제 상태여도 남은 슬롯은 집계(X-07). 제출 여부 자체는 노출하지 않음
+      })),
+      me: {
+        participantId: me.id,
+        version: me.availabilityVersion,
+        submitted: me.availabilitySubmittedAt !== null,
+        slots: slotsOf(me),
+      },
     },
-    totalParticipants: people.length,
-    participants: people.map((x) => ({
-      participantId: x.id,
-      nickname: x.nickname,
-      isHost: x.role === "host",
-      availableSlots: x.availabilitySubmittedAt ? slotsOf(x) : [], // 제출 여부 자체는 노출하지 않음
-    })),
-    me: {
-      participantId: me.id,
-      version: me.availabilityVersion,
-      submitted: me.availabilitySubmittedAt !== null,
-      slots: slotsOf(me),
-    },
-  }, { headers: { "Cache-Control": "no-store" } });
+    { headers: { "Cache-Control": "no-store" } },
+  );
 }
 ```
 
@@ -537,7 +591,7 @@ sequenceDiagram
 
 1. 승주가 수정 중이다(기준 버전 3).
 2. 방장이 종료일을 늘리면 STATE-09-04에 따라 승주의 제출이 해제되고, STATE 범위 변경 API가 버전을 4로 올린다.
-3. 다음 폴링에서 "기준 3 ≠ 현재 4"이므로 로컬을 폐기하고, 서버에 남은 슬롯(`me.slots`)을 보여준 뒤 새 범위를 확인해 다시 제출하도록 안내한다.
+3. 다음 폴링에서 "기준 3 ≠ 현재 4"이므로 로컬을 폐기하고, 서버에 남은 슬롯(`me.slots`)을 보여준 뒤 새 범위를 확인해 다시 제출하도록 안내한다. 다시 제출하기 전에도 남은 슬롯은 집계·후보 계산에 들어간다(2026-11-11 결정, X-07).
 
 ### 왜 제출 시각이 아니라 버전인가
 
@@ -557,13 +611,13 @@ sequenceDiagram
 
 ## 상태별 허용 표
 
-| 상태 | 제출 (TIME-API-01) | 현황 조회 (TIME-API-02) | 비고 |
-| --- | --- | --- | --- |
-| draft | 409 PROMISE_NOT_COLLECTING | 409 PROMISE_NOT_COLLECTING | 방장 설정 중 |
-| collecting | 가능 | 가능 (5초 폴링) | 마감 시각이 지났으면 closed로 처리 |
-| closed | 409 VOTING_CLOSED | 가능 (본인 입력 확인, STATE-06-02) | 5초 폴링 유지 (확정·재조율 반영) |
-| confirmed | 409 VOTING_CLOSED | 가능 | 입력 잠금 (STATE-08-01) |
-| cancelled | 409 PROMISE_CANCELLED | 409 PROMISE_CANCELLED | 데이터는 보관, 조회·수정 불가 (10/13 결정) |
+| 상태       | 제출 (TIME-API-01)         | 현황 조회 (TIME-API-02)            | 비고                                       |
+| ---------- | -------------------------- | ---------------------------------- | ------------------------------------------ |
+| draft      | 409 PROMISE_NOT_COLLECTING | 409 PROMISE_NOT_COLLECTING         | 방장 설정 중                               |
+| collecting | 가능                       | 가능 (5초 폴링)                    | 마감 시각이 지났으면 closed로 처리         |
+| closed     | 409 VOTING_CLOSED          | 가능 (본인 입력 확인, STATE-06-02) | 5초 폴링 유지 (확정·재조율 반영)           |
+| confirmed  | 409 VOTING_CLOSED          | 가능                               | 입력 잠금 (STATE-08-01)                    |
+| cancelled  | 409 PROMISE_CANCELLED      | 409 PROMISE_CANCELLED              | 데이터는 보관, 조회·수정 불가 (10/13 결정) |
 
 마감 판정: 조회 API는 DB를 바꾸지 않고 `effectiveStatus`로 계산해 응답한다. 실제 closed 전환은 쓰기 요청이 처리한다. 모든 API가 이 함수로 상태를 판단한다(MEMBER-API-00 추가 요청).
 
@@ -571,16 +625,16 @@ sequenceDiagram
 
 ## 시간 표기 규약
 
-| 구분 | 형식 | 예시 | 근거 |
-| --- | --- | --- | --- |
-| 실제 시점 (슬롯·마감·확정) | ISO-8601, +09:00 포함 | `2026-10-20T14:00:00+09:00` | TIME-01-01, 02-01 |
-| 제출 시각 | ISO-8601, 밀리초 3자리 | `2026-10-12T14:35:10.027+09:00` | 제출 여부 판단용 (비교에는 사용 안 함) |
-| 버전 | 정수, 참여자별, 0부터 시작 | `4` | TIME-10-04 (10/27 확정) |
-| 로컬 저장 형식 | v(저장 형식 버전), baseVersion, slots | `{ "v": 1, "baseVersion": 3, "slots": [...] }` | 저장 형식 변경 대비 |
-| 날짜 범위 | YYYY-MM-DD (한국 날짜) | `2026-10-20` | TIME-02-01 |
-| 하루 시각 | "HH:mm" 문자열, 24:00 허용 | `"09:00"`, `"24:00"` | TIME-05-02 |
-| DB 타입 | 실제 시점은 Timestamptz(3) | `@db.Timestamptz(3)` | TIME-02-03 |
-| 마감 판정 | 서버 시각, 현재 ≥ 마감 시각이면 마감 | 14:00:00.000 제출은 거절 | STATE-05-01 |
+| 구분                       | 형식                                  | 예시                                           | 근거                                   |
+| -------------------------- | ------------------------------------- | ---------------------------------------------- | -------------------------------------- |
+| 실제 시점 (슬롯·마감·확정) | ISO-8601, +09:00 포함                 | `2026-10-20T14:00:00+09:00`                    | TIME-01-01, 02-01                      |
+| 제출 시각                  | ISO-8601, 밀리초 3자리                | `2026-10-12T14:35:10.027+09:00`                | 제출 여부 판단용 (비교에는 사용 안 함) |
+| 버전                       | 정수, 참여자별, 0부터 시작            | `4`                                            | TIME-10-04 (10/27 확정)                |
+| 로컬 저장 형식             | v(저장 형식 버전), baseVersion, slots | `{ "v": 1, "baseVersion": 3, "slots": [...] }` | 저장 형식 변경 대비                    |
+| 날짜 범위                  | YYYY-MM-DD (한국 날짜)                | `2026-10-20`                                   | TIME-02-01                             |
+| 하루 시각                  | "HH:mm" 문자열, 24:00 허용            | `"09:00"`, `"24:00"`                           | TIME-05-02                             |
+| DB 타입                    | 실제 시점은 Timestamptz(3)            | `@db.Timestamptz(3)`                           | TIME-02-03                             |
+| 마감 판정                  | 서버 시각, 현재 ≥ 마감 시각이면 마감  | 14:00:00.000 제출은 거절                       | STATE-05-01                            |
 
 - 슬롯 범위 검사: 한국 날짜가 날짜 범위 안이고, 시작 ≥ 하루 시작 시각, 시작 + 30분 ≤ 하루 종료 시각(24:00은 1440분으로 계산). 지난 슬롯(시작 ≤ 현재)은 무시하고, 이미 저장된 지난 슬롯은 보존한다 (제안).
 - 24:00 주의: Prisma가 time 값을 JS Date로 바꾸면 다음 날 00:00으로 넘어가므로, API에서는 문자열로 주고받는다.
@@ -589,23 +643,23 @@ sequenceDiagram
 
 ## 도메인 경계
 
-| 하는 일 | 담당 | TIME과의 관계 |
-| --- | --- | --- |
-| 가능 시간 제출, 현황 조회 | TIME | 직접 처리 |
-| 로컬 저장, 날짜 선택 토글, 폴링 주기 | 프론트 | API 없음 |
-| 범위·소요 시간 설정, 범위 밖 슬롯 삭제, 제출 해제(둘 다 버전 +1) | STATE | 결과(바뀐 범위·버전)만 읽음 |
-| 조기 마감, 재조율, 취소 | STATE | 상태만 확인 |
-| 후보 계산, 확정 | RESULT | 제출값을 제공 |
-| 인증, 탈퇴, 명단 | MEMBER | 공통 세션 규약(MEMBER-API-00) 사용 |
+| 하는 일                                                          | 담당   | TIME과의 관계                      |
+| ---------------------------------------------------------------- | ------ | ---------------------------------- |
+| 가능 시간 제출, 현황 조회                                        | TIME   | 직접 처리                          |
+| 로컬 저장, 날짜 선택 토글, 폴링 주기                             | 프론트 | API 없음                           |
+| 범위·소요 시간 설정, 범위 밖 슬롯 삭제, 제출 해제(둘 다 버전 +1) | STATE  | 결과(바뀐 범위·버전)만 읽음        |
+| 조기 마감, 재조율, 취소                                          | STATE  | 상태만 확인                        |
+| 후보 계산, 확정                                                  | RESULT | 제출값을 제공                      |
+| 인증, 탈퇴, 명단                                                 | MEMBER | 공통 세션 규약(MEMBER-API-00) 사용 |
 
 ---
 
 ## 용어
 
-- **미제출**: 한 번도 제출하지 않았거나 제출이 해제된 상태. 제출 시각이 비어 있다. 화면에는 모든 시간 "불가능"(TIME-12-02).
+- **미제출**: 한 번도 제출하지 않은 상태. 제출 시각이 비어 있다. 화면에는 모든 시간 "불가능"(TIME-12-02).
 - **빈 선택 제출**: 슬롯 0개로 제출한 것. 모든 시간 불가능이며 제출 시각은 있다(TIME-12-01).
 - **재제출**: 제출 후 수정해서 다시 제출하는 것. 재제출 전까지 기존 제출값이 유지된다(TIME-11-02).
-- **제출 해제**: 범위가 늘어나 서버가 제출 시각을 비우고 버전을 +1 하는 것(STATE-09-04). 다시 제출하기 전까지 미제출로 본다(TIME-10-03). DB의 슬롯은 남아 있지만 다른 참여자에게는 보이지 않는다.
+- **제출 해제**: 범위가 늘어나 서버가 제출 시각을 비우고 버전을 +1 하는 것(STATE-09-04). 범위 안에 남은 슬롯은 다시 제출하기 전에도 계속 집계·후보 계산에 들어가고 다른 참여자에게도 보인다. 새로 생긴 시간만 고르지 않은 것으로 본다(2026-11-11 결정, X-07).
 - **기준 버전**: 로컬 수정을 시작한 시점의 서버 버전. 서버 값과 다르면 로컬을 폐기하고 제출을 거절한다(TIME-10-04).
 - **재설정**: collecting 중 설정 변경. 상태는 그대로다(STATE-01-02).
 - **재조율**: closed·confirmed를 collecting으로 되돌리는 것(STATE-01-02).
@@ -625,7 +679,7 @@ sequenceDiagram
 - [x] 마감 후에도 5초 간격으로 폴링을 계속한다. 탭이 숨겨지면 중지하고, 돌아오면 즉시 조회한다.
 - [x] 취소된 약속의 데이터는 삭제하지 않고 모두 보관
 - [x] TIME-10-04: "새로우면" → "다르면"
-- [x] TIME-10-03: "범위 변경으로 제출이 해제된 참여자는 다시 제출하기 전까지 미제출로 본다" 추가
+- [x] TIME-10-03: ~~"범위 변경으로 제출이 해제된 참여자는 다시 제출하기 전까지 미제출로 본다" 추가~~ → 2026-11-11 결정(X-07)으로 바뀜: 제출이 해제돼도 범위 안에 남은 슬롯은 계속 집계한다
 - [x] TIME-10-02 예시: "미응답으로 표시" → "불가능으로 표시"
 - [x] TIME-11-01: "재조율은 후속 범위다" 삭제
 - [x] STATE-06-02: "제출 취소" 삭제

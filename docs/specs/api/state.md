@@ -57,9 +57,7 @@ STATE-API-01~10을 작성했다. 01 조회, 02 모집 시작, 03 모집 중 설�
   "message": "현재 약속 상태에서는 요청할 수 없습니다.",
   "details": {
     "promiseStatus": "collecting",
-    "allowedStates": [
-      "closed"
-    ]
+    "allowedStates": ["closed"]
   }
 }
 ```
@@ -81,19 +79,19 @@ draft는 `promises.created_at+10분`에 만료된다. GET 요청은 만료 여�
 
 #### ERD 대응
 
-| API 데이터 | DB 또는 계산 기준 |
-| --- | --- |
-| promiseStatus | GET 응답은 현재 시각을 반영한 effectiveStatus, 쓰기 응답은 트랜잭션 완료 후 promises.status |
-| participantLimit | promises.participant_limit — 방장 포함 2~30명 |
-| settings.dateRange | promises.date_range_start, date_range_end |
-| settings.dailyTimeRange | promises.daily_start_minute, daily_end_minute을 HH:mm으로 변환. 종료에는 24:00 허용 |
-| settings.durationMinutes | promises.duration_minutes |
-| settings.votingDeadlineAt | promises.voting_deadline_at |
-| 방장 판정 | 세션 참여자의 participants.role=host 및 status=active |
-| 본인 제출 여부 | participants.availability_submitted_at — NULL이면 미제출; 기존 MEMBER-API-05가 조회 |
-| currentConfirmation.startAt | promises.confirmed_start_at |
-| currentConfirmation.endAt | confirmed_start_at + duration_minutes |
-| 후보 인원·순위 | participant_available_slots와 제출 완료 active 참여자로 계산; 후보 테이블 없음 |
+| API 데이터                  | DB 또는 계산 기준                                                                                                                    |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| promiseStatus               | GET 응답은 현재 시각을 반영한 effectiveStatus, 쓰기 응답은 트랜잭션 완료 후 promises.status                                          |
+| participantLimit            | promises.participant_limit — 방장 포함 2~30명                                                                                        |
+| settings.dateRange          | promises.date_range_start, date_range_end                                                                                            |
+| settings.dailyTimeRange     | promises.daily_start_minute, daily_end_minute을 HH:mm으로 변환. 종료에는 24:00 허용                                                  |
+| settings.durationMinutes    | promises.duration_minutes                                                                                                            |
+| settings.votingDeadlineAt   | promises.voting_deadline_at                                                                                                          |
+| 방장 판정                   | 세션 참여자의 participants.role=host 및 status=active                                                                                |
+| 본인 제출 여부              | participants.availability_submitted_at — NULL이면 미제출; 기존 MEMBER-API-05가 조회                                                  |
+| currentConfirmation.startAt | promises.confirmed_start_at                                                                                                          |
+| currentConfirmation.endAt   | confirmed_start_at + duration_minutes                                                                                                |
+| 후보 인원·순위              | participant_available_slots와 active 참여자로 계산(제출 상태가 풀린 참여자의 남은 슬롯 포함, 2026-11-11 결정 X-07); 후보 테이블 없음 |
 
 현재 ERD에 없는 host_participant_id·dateRangeLimitMonths·closedAt·closeReason·변경 이력·설정 전용 버전 필드를 기존 컬럼으로 가정하지 않는다. 설정 변경은 STATE-API-01의 settings 전체를 주기적으로 조회해 이전 값과 비교하여 감지한다.
 
@@ -113,7 +111,7 @@ draft는 `promises.created_at+10분`에 만료된다. GET 요청은 만료 여�
 
 #### 후보 계산 계약
 
-1. participants.status=active이고 availability_submitted_at이 있는 참여자만 집계한다.
+1. participants.status=active인 참여자의 저장된(제출된) 슬롯을 집계한다. 범위 확대로 `availability_submitted_at`이 비워진 참여자도 범위 안에 남은 슬롯은 집계한다(2026-11-11 결정, X-07). 로컬에만 있는 미제출 입력은 서버에 없으므로 집계되지 않는다.
 2. 한국 기준 30분 경계의 미래 시각을 후보 시작점으로 한다. 전체 선택 날짜 범위를 대상으로 한다.
 3. 약속의 duration_minutes는 30 이상·30의 배수이고 전체 구간이 해당 날짜의 하루 선택 범위 안에 있어야 한다.
 4. 해당 구간의 모든 연속 슬롯에 가능한 동일 참여자를 집계한다. 슬롯별 인원수 합이나 최솟값으로 대신하지 않는다.
@@ -124,13 +122,13 @@ draft는 `promises.created_at+10분`에 만료된다. GET 요청은 만료 여�
 
 #### 상태값
 
-| 상태 | 의미 |
-| --- | --- |
-| draft | 방장 설정 미완료 |
-| collecting | 가능 시간 수집 |
-| closed | 마감·일정 미확정 |
-| confirmed | 일정 확정 |
-| cancelled | 약속 취소 |
+| 상태       | 의미             |
+| ---------- | ---------------- |
+| draft      | 방장 설정 미완료 |
+| collecting | 가능 시간 수집   |
+| closed     | 마감·일정 미확정 |
+| confirmed  | 일정 확정        |
+| cancelled  | 약속 취소        |
 
 participants.status의 active·cancelled는 약속 상태 enum과 다른 값이다. 탈퇴 상태로 left를 추가하지 않는다.
 
@@ -195,16 +193,16 @@ participants.status의 active·cancelled는 약속 상태 enum과 다른 값이�
 
 #### 헤더
 
-| Name | Value | 필수 |
-| --- | --- | --- |
-| Cookie | ys_session_{promiseId}=… | 예 |
-| Accept | application/json | 권장 |
+| Name   | Value                    | 필수 |
+| ------ | ------------------------ | ---- |
+| Cookie | ys_session_{promiseId}=… | 예   |
+| Accept | application/json         | 권장 |
 
 #### Path Parameter
 
-| 이름 | 타입 | 설명 | 필수 |
-| --- | --- | --- | --- |
-| promiseId | string(UUID) | 초대 링크 조회나 방장 등록으로 받은 약속 ID | 예 |
+| 이름      | 타입         | 설명                                        | 필수 |
+| --------- | ------------ | ------------------------------------------- | ---- |
+| promiseId | string(UUID) | 초대 링크 조회나 방장 등록으로 받은 약속 ID | 예   |
 
 #### Request Body
 
@@ -214,22 +212,22 @@ participants.status의 active·cancelled는 약속 상태 enum과 다른 값이�
 
 #### Status Code: 200 OK
 
-| 이름 | 타입 | 설명 |
-| --- | --- | --- |
-| promiseId | string(UUID) | 약속 ID |
-| promiseStatus | enum | draft / collecting / closed / confirmed |
-| settings | object | draft 미설정 값은 각 필드 NULL |
-| settings.participantLimit | integer 또는 null | 방장 포함 2~30명 정원 |
-| settings.dateRange.startDate / endDate | string(date) 또는 null | 선택 시작·종료 날짜, 양끝 포함 |
-| settings.dailyTimeRange.startTime / endTime | string(time) 또는 null | 분 단위 DB 값을 HH:mm으로 변환. 종료에는 24:00 허용 |
-| settings.durationMinutes | integer 또는 null | 30분 배수 소요 시간 |
-| settings.votingDeadlineAt | string(date-time) 또는 null | 응답 마감 시각 |
-| draftExpiresAt | string(date-time) 또는 null | draft이면 created_at+10분, 그 외 null |
-| draftExpired | boolean | GET 기준 draft 만료 여부. GET은 DB를 변경하지 않음 |
-| currentConfirmation | object 또는 null | confirmed일 때만 현재 확정 일정 |
-| currentConfirmation.startAt / endAt | string(date-time) | 확정 시작 / 시작+현재 소요 시간 |
-| currentConfirmation.availableParticipantCount | integer | 현재 active·제출 완료 참여자 중 확정 시간 전체에 가능한 인원 |
-| currentConfirmation.hostActionRequired | boolean | 요청자가 host이고 참석 가능 인원이 2명 미만이면 true |
+| 이름                                          | 타입                        | 설명                                                         |
+| --------------------------------------------- | --------------------------- | ------------------------------------------------------------ |
+| promiseId                                     | string(UUID)                | 약속 ID                                                      |
+| promiseStatus                                 | enum                        | draft / collecting / closed / confirmed                      |
+| settings                                      | object                      | draft 미설정 값은 각 필드 NULL                               |
+| settings.participantLimit                     | integer 또는 null           | 방장 포함 2~30명 정원                                        |
+| settings.dateRange.startDate / endDate        | string(date) 또는 null      | 선택 시작·종료 날짜, 양끝 포함                               |
+| settings.dailyTimeRange.startTime / endTime   | string(time) 또는 null      | 분 단위 DB 값을 HH:mm으로 변환. 종료에는 24:00 허용          |
+| settings.durationMinutes                      | integer 또는 null           | 30분 배수 소요 시간                                          |
+| settings.votingDeadlineAt                     | string(date-time) 또는 null | 응답 마감 시각                                               |
+| draftExpiresAt                                | string(date-time) 또는 null | draft이면 created_at+10분, 그 외 null                        |
+| draftExpired                                  | boolean                     | GET 기준 draft 만료 여부. GET은 DB를 변경하지 않음           |
+| currentConfirmation                           | object 또는 null            | confirmed일 때만 현재 확정 일정                              |
+| currentConfirmation.startAt / endAt           | string(date-time)           | 확정 시작 / 시작+현재 소요 시간                              |
+| currentConfirmation.availableParticipantCount | integer                     | 현재 active·제출 완료 참여자 중 확정 시간 전체에 가능한 인원 |
+| currentConfirmation.hostActionRequired        | boolean                     | 요청자가 host이고 참석 가능 인원이 2명 미만이면 true         |
 
 #### Response Body
 
@@ -288,15 +286,15 @@ participants.status의 active·cancelled는 약속 상태 enum과 다른 값이�
 
 ### 에러
 
-| HTTP 상태 | code | 발생 원인 | message 예시 |
-| --- | --- | --- | --- |
-| 400 | INVALID_REQUEST | UUID·JSON·쿼리·필수값 형식 오류 | 요청 형식을 확인해 주세요. |
-| 401 | UNAUTHENTICATED | 세션 없음·만료·해시 불일치 또는 참여자 비활성 | 다시 로그인해 주세요. |
-| 403 | FORBIDDEN | 다른 약속 소속 또는 방장 권한 부족 | 이 작업을 수행할 권한이 없습니다. |
-| 404 | PROMISE_NOT_FOUND | 약속 없음 | 약속을 찾을 수 없습니다. |
-| 409 | PROMISE_CANCELLED | 약속이 취소됨 | 취소된 약속입니다. |
-| 409 | INVALID_PROMISE_STATE | 이 API에서 허용하지 않는 약속 상태 | 현재 약속 상태에서는 요청할 수 없습니다. |
-| 500 | INTERNAL_ERROR | 서버 오류 | 처리 중 오류가 발생했습니다. |
+| HTTP 상태 | code                  | 발생 원인                                     | message 예시                             |
+| --------- | --------------------- | --------------------------------------------- | ---------------------------------------- |
+| 400       | INVALID_REQUEST       | UUID·JSON·쿼리·필수값 형식 오류               | 요청 형식을 확인해 주세요.               |
+| 401       | UNAUTHENTICATED       | 세션 없음·만료·해시 불일치 또는 참여자 비활성 | 다시 로그인해 주세요.                    |
+| 403       | FORBIDDEN             | 다른 약속 소속 또는 방장 권한 부족            | 이 작업을 수행할 권한이 없습니다.        |
+| 404       | PROMISE_NOT_FOUND     | 약속 없음                                     | 약속을 찾을 수 없습니다.                 |
+| 409       | PROMISE_CANCELLED     | 약속이 취소됨                                 | 취소된 약속입니다.                       |
+| 409       | INVALID_PROMISE_STATE | 이 API에서 허용하지 않는 약속 상태            | 현재 약속 상태에서는 요청할 수 없습니다. |
+| 500       | INTERNAL_ERROR        | 서버 오류                                     | 처리 중 오류가 발생했습니다.             |
 
 #### 오류 응답 예제
 
@@ -322,9 +320,9 @@ participants.status의 active·cancelled는 약속 상태 enum과 다른 값이�
 
 ```javascript
 const response = await fetch(`/api/v1/promises/${promiseId}`, {
-  method: 'GET',
-  credentials: 'include',
-  headers: { Accept: 'application/json' },
+  method: "GET",
+  credentials: "include",
+  headers: { Accept: "application/json" },
 });
 const result = await response.json();
 if (!response.ok) {
@@ -385,8 +383,8 @@ if (!response.ok) {
 ```json
 {
   "participantLimit": 8,
-  "dateRange": {"startDate":"2026-10-20","endDate":"2026-10-31"},
-  "dailyTimeRange": {"startTime":"09:00","endTime":"18:00"},
+  "dateRange": { "startDate": "2026-10-20", "endDate": "2026-10-31" },
+  "dailyTimeRange": { "startTime": "09:00", "endTime": "18:00" },
   "durationMinutes": 60,
   "votingDeadlineAt": "2026-10-19T18:00:00+09:00"
 }
@@ -398,14 +396,14 @@ if (!response.ok) {
 
 ```json
 {
-  "promiseId":"7c1b2f40-808a-4f31-8a27-d849330dd123",
-  "promiseStatus":"collecting",
-  "settings":{
-    "participantLimit":8,
-    "dateRange":{"startDate":"2026-10-20","endDate":"2026-10-31"},
-    "dailyTimeRange":{"startTime":"09:00","endTime":"18:00"},
-    "durationMinutes":60,
-    "votingDeadlineAt":"2026-10-19T18:00:00+09:00"
+  "promiseId": "7c1b2f40-808a-4f31-8a27-d849330dd123",
+  "promiseStatus": "collecting",
+  "settings": {
+    "participantLimit": 8,
+    "dateRange": { "startDate": "2026-10-20", "endDate": "2026-10-31" },
+    "dailyTimeRange": { "startTime": "09:00", "endTime": "18:00" },
+    "durationMinutes": 60,
+    "votingDeadlineAt": "2026-10-19T18:00:00+09:00"
   }
 }
 ```
@@ -453,7 +451,7 @@ if (!response.ok) {
 ### 0. 규칙 연결
 
 - 도메인: STATE
-- 관련 규칙: STATE-04-01~03, STATE-09-03~05, REVIEW-08, REVIEW-14, REVIEW-15
+- 관련 규칙: STATE-04-01~03, STATE-09-03~05, MEMBER-07-03, TIME-14-03/04, REVIEW-08, REVIEW-14, REVIEW-15
 - 권한: 현재 active host
 - 허용 상태: collecting이며 마감 전
 - 상태 전환: collecting 유지
@@ -461,7 +459,7 @@ if (!response.ok) {
 
 ### 1. 기본 정보
 
-- **목적:** 모집 중 허용된 설정을 변경한다. 날짜·하루 시간 범위 변경은 재조율로 취급하지만 별도 상태값은 만들지 않는다.
+- **목적:** 모집 중 허용된 설정(약속 이름, 날짜 범위, 정원, 마감)을 변경한다(재설정). 재설정은 재조율이 아니며 상태는 collecting 그대로다(STATE-01-02, 2026-11-11 결정).
 - **HTTP Method:** PATCH
 - **Endpoint:** `/api/v1/promises/{promiseId}/settings`
 - **Authentication Required:** 예
@@ -469,21 +467,18 @@ if (!response.ok) {
 
 ### 요청
 
-한 필드 이상 필요하며 생략한 값은 유지한다. `dateRange`와 `dailyTimeRange`는 시작·종료를 함께 보낸다.
+한 필드 이상 필요하며 생략한 값은 유지한다. `dateRange`는 시작·종료를 함께 보낸다.
 
-- `participantLimit`: 현재 active 인원 이상이면서 최대 30명. 모집 중에는 증가만 허용
-- `dateRange`: 최대 90일
-
-> ⚠️ 비즈니스 규칙 STATE-03-01은 "오늘부터 3개월"로 규정. 불일치 — 팀 확인 필요.
-
-- `dailyTimeRange`: 시작은 00:00~23:30, 종료는 00:30~24:00의 30분 경계. 서버는 분 값으로 변환하고 시작 분 < 종료 분을 검증
-- `durationMinutes`: 30 이상·30분 배수
-- `votingDeadlineAt`: 현재보다 미래이고 기존 마감보다 늦은 값만 허용
+- `title`: 약속 이름. 1~30자(화면에 보이는 글자 기준), 앞뒤 공백 제거(STATE-03-01)
+- `participantLimit`: 2~30명이며 현재 active 인원 이상. 모집 중에도 현재 active 인원까지 감소 허용(2026-11-11 결정, MEMBER-07-03)
+- `dateRange`: 오늘(KST)부터, 양 끝 포함 최대 90일(TIME-04-01~03)
+- `votingDeadlineAt`: 연장·단축 모두 허용. 잠금 후 서버 시각 + 30분 이상, 날짜 범위 마지막 날 00:00(KST) 미만의 30분 경계(TIME-14-01/02, 2026-11-11 결정 TIME-14-03/04)
+- `dailyTimeRange`, `durationMinutes`: 받지 않는다. 하루 시간 범위(09:00~24:00)와 약속 길이(2시간)는 MVP 고정이다(2026-11-11 결정, STATE-03-01)
 
 ```json
 {
-  "dateRange":{"startDate":"2026-10-20","endDate":"2026-10-27"},
-  "durationMinutes":90
+  "dateRange": { "startDate": "2026-10-20", "endDate": "2026-10-27" },
+  "participantLimit": 5
 }
 ```
 
@@ -497,10 +492,23 @@ if (!response.ok) {
 
 ```json
 {
-  "promiseId":"7c1b2f40-808a-4f31-8a27-d849330dd123",
-  "promiseStatus":"collecting",
-  "settings":{"participantLimit":8,"dateRange":{"startDate":"2026-10-20","endDate":"2026-10-27"},"dailyTimeRange":{"startTime":"09:00","endTime":"18:00"},"durationMinutes":90,"votingDeadlineAt":"2026-10-19T18:00:00+09:00"},
-  "changeImpact":{"rangeChanged":true,"hasAddedSelectableSlots":false,"submissionsReset":false,"removedSlotCount":12,"versionChangedParticipantCount":3,"candidateRecalculationRequired":true}
+  "promiseId": "7c1b2f40-808a-4f31-8a27-d849330dd123",
+  "promiseStatus": "collecting",
+  "settings": {
+    "participantLimit": 8,
+    "dateRange": { "startDate": "2026-10-20", "endDate": "2026-10-27" },
+    "dailyTimeRange": { "startTime": "09:00", "endTime": "18:00" },
+    "durationMinutes": 90,
+    "votingDeadlineAt": "2026-10-19T18:00:00+09:00"
+  },
+  "changeImpact": {
+    "rangeChanged": true,
+    "hasAddedSelectableSlots": false,
+    "submissionsReset": false,
+    "removedSlotCount": 12,
+    "versionChangedParticipantCount": 3,
+    "candidateRecalculationRequired": true
+  }
 }
 ```
 
@@ -508,8 +516,7 @@ if (!response.ok) {
 
 #### 추가 오류
 
-- `422 CAPACITY_DECREASE_NOT_ALLOWED`: 모집 중 정원 감소
-- `422 DEADLINE_SHORTEN_NOT_ALLOWED`: 모집 중 마감 단축
+- `422 CAPACITY_BELOW_ACTIVE_COUNT`: 정원이 현재 active 인원보다 작음 (2026-11-11 결정: `CAPACITY_DECREASE_NOT_ALLOWED`를 바꿈. 마감 단축 거부 `DEADLINE_SHORTEN_NOT_ALLOWED`는 없앰)
 
 #### 공통 오류
 
@@ -532,8 +539,8 @@ if (!response.ok) {
 4. `B-A`가 비어 있는 축소만 발생하면 기존 제출 상태를 유지한다.
 5. 축소로 실제 슬롯이 삭제된 참여자의 `availability_version`만 1 증가시킨다. 실제 슬롯이 삭제되지 않은 참여자의 버전은 변경하지 않는다.
 6. `B-A`가 하나라도 있는 확대·이동이면 모든 active 참여자의 `availability_submitted_at=NULL` 처리와 `availability_version+1`을 수행한다. 제출 시각이 이미 NULL이어도 버전을 증가시킨다.
-7. 범위를 바꾸지 않고 소요 시간만 변경하거나 정원·마감만 변경한 경우 슬롯·제출 상태·버전을 유지하고 필요한 후보 계산만 새 설정으로 수행한다. 설정 전용 버전은 두지 않으며 참여자 화면은 STATE-API-01의 settings 전체를 주기적으로 비교한다.
-8. 마감을 연장할 때는 active 참여자의 현재 유효한 세션만 새 `votingDeadlineAt+7일`로 갱신한다. 이미 만료됐거나 cancelled 참여자의 세션은 다시 활성화하지 않는다.
+7. 범위를 바꾸지 않고 이름·정원·마감만 변경한 경우 슬롯·제출 상태·버전을 유지한다. 설정 전용 버전은 두지 않으며 참여자 화면은 STATE-API-01의 settings 전체를 주기적으로 비교한다.
+8. 마감을 바꿀 때(연장·단축)는 active 참여자의 현재 유효한 세션만 새 `votingDeadlineAt+7일`로 갱신한다. 이미 만료됐거나 cancelled 참여자의 세션은 다시 활성화하지 않는다.
 9. 현재 ERD에는 변경 이력 테이블이 없으므로 과거 changeNotice를 영구 저장하지 않는다. `changeImpact`는 이번 요청의 계산 결과다.
 
 ### 보안 정보
@@ -579,17 +586,17 @@ if (!response.ok) {
 
 #### 헤더
 
-| Name | Value | 필수 |
-| --- | --- | --- |
-| Cookie | ys_session_{promiseId}=… | 예 |
-| Accept | application/json | 권장 |
-| Origin | 서비스의 허용 Origin | 예 |
+| Name   | Value                    | 필수 |
+| ------ | ------------------------ | ---- |
+| Cookie | ys_session_{promiseId}=… | 예   |
+| Accept | application/json         | 권장 |
+| Origin | 서비스의 허용 Origin     | 예   |
 
 #### Path Parameter
 
-| 이름 | 타입 | 설명 | 필수 |
-| --- | --- | --- | --- |
-| promiseId | string(UUID) | 초대 링크 조회나 방장 등록으로 받은 약속 ID | 예 |
+| 이름      | 타입         | 설명                                        | 필수 |
+| --------- | ------------ | ------------------------------------------- | ---- |
+| promiseId | string(UUID) | 초대 링크 조회나 방장 등록으로 받은 약속 ID | 예   |
 
 #### Request Body
 
@@ -599,10 +606,10 @@ if (!response.ok) {
 
 #### Status Code: 200 OK
 
-| 이름 | 타입 | 설명 |
-| --- | --- | --- |
-| promiseId | string(UUID) | 약속 ID |
-| promiseStatus | closed | 기한 또는 방장 마감 후 상태 |
+| 이름          | 타입         | 설명                        |
+| ------------- | ------------ | --------------------------- |
+| promiseId     | string(UUID) | 약속 ID                     |
+| promiseStatus | closed       | 기한 또는 방장 마감 후 상태 |
 
 #### Response Body
 
@@ -615,15 +622,15 @@ if (!response.ok) {
 
 ### 에러
 
-| HTTP 상태 | code | 발생 원인 | message 예시 |
-| --- | --- | --- | --- |
-| 400 | INVALID_REQUEST | UUID·JSON·쿼리·필수값 형식 오류 | 요청 형식을 확인해 주세요. |
-| 401 | UNAUTHENTICATED | 세션 없음·만료·해시 불일치 또는 참여자 비활성 | 다시 로그인해 주세요. |
-| 403 | FORBIDDEN | 다른 약속 소속 또는 방장 권한 부족 | 이 작업을 수행할 권한이 없습니다. |
-| 404 | PROMISE_NOT_FOUND | 약속 없음 | 약속을 찾을 수 없습니다. |
-| 409 | PROMISE_CANCELLED | 약속이 취소됨 | 취소된 약속입니다. |
-| 409 | INVALID_PROMISE_STATE | 이 API에서 허용하지 않는 약속 상태 | 현재 약속 상태에서는 요청할 수 없습니다. |
-| 500 | INTERNAL_ERROR | 서버 오류 | 처리 중 오류가 발생했습니다. |
+| HTTP 상태 | code                  | 발생 원인                                     | message 예시                             |
+| --------- | --------------------- | --------------------------------------------- | ---------------------------------------- |
+| 400       | INVALID_REQUEST       | UUID·JSON·쿼리·필수값 형식 오류               | 요청 형식을 확인해 주세요.               |
+| 401       | UNAUTHENTICATED       | 세션 없음·만료·해시 불일치 또는 참여자 비활성 | 다시 로그인해 주세요.                    |
+| 403       | FORBIDDEN             | 다른 약속 소속 또는 방장 권한 부족            | 이 작업을 수행할 권한이 없습니다.        |
+| 404       | PROMISE_NOT_FOUND     | 약속 없음                                     | 약속을 찾을 수 없습니다.                 |
+| 409       | PROMISE_CANCELLED     | 약속이 취소됨                                 | 취소된 약속입니다.                       |
+| 409       | INVALID_PROMISE_STATE | 이 API에서 허용하지 않는 약속 상태            | 현재 약속 상태에서는 요청할 수 없습니다. |
+| 500       | INTERNAL_ERROR        | 서버 오류                                     | 처리 중 오류가 발생했습니다.             |
 
 #### 오류 응답 예제
 
@@ -633,10 +640,7 @@ if (!response.ok) {
   "message": "현재 약속 상태에서는 마감할 수 없습니다.",
   "details": {
     "promiseStatus": "confirmed",
-    "allowedStates": [
-      "collecting",
-      "closed"
-    ]
+    "allowedStates": ["collecting", "closed"]
   }
 }
 ```
@@ -656,9 +660,9 @@ if (!response.ok) {
 
 ```javascript
 const response = await fetch(`/api/v1/promises/${promiseId}/close`, {
-  method: 'POST',
-  credentials: 'include',
-  headers: { Accept: 'application/json' },
+  method: "POST",
+  credentials: "include",
+  headers: { Accept: "application/json" },
 });
 const result = await response.json();
 if (!response.ok) {
@@ -710,24 +714,24 @@ if (!response.ok) {
 
 #### 헤더
 
-| Name | Value | 필수 |
-| --- | --- | --- |
-| Cookie | ys_session_{promiseId}=… | 예 |
-| Accept | application/json | 권장 |
-| Origin | 서비스의 허용 Origin | 예 |
-| Content-Type | application/json | 예 |
+| Name         | Value                    | 필수 |
+| ------------ | ------------------------ | ---- |
+| Cookie       | ys_session_{promiseId}=… | 예   |
+| Accept       | application/json         | 권장 |
+| Origin       | 서비스의 허용 Origin     | 예   |
+| Content-Type | application/json         | 예   |
 
 #### Path Parameter
 
-| 이름 | 타입 | 설명 | 필수 |
-| --- | --- | --- | --- |
-| promiseId | string(UUID) | 초대 링크 조회나 방장 등록으로 받은 약속 ID | 예 |
+| 이름      | 타입         | 설명                                        | 필수 |
+| --------- | ------------ | ------------------------------------------- | ---- |
+| promiseId | string(UUID) | 초대 링크 조회나 방장 등록으로 받은 약속 ID | 예   |
 
 #### Request Body
 
-| 이름 | 타입 | 설명 | 필수 | 기본값 |
-| --- | --- | --- | --- | --- |
-| startAt | string(date-time) | 오프셋 포함 ISO 8601. 한국 30분 경계의 미래 후보 시작 | 예 | 없음 |
+| 이름    | 타입              | 설명                                                  | 필수 | 기본값 |
+| ------- | ----------------- | ----------------------------------------------------- | ---- | ------ |
+| startAt | string(date-time) | 오프셋 포함 ISO 8601. 한국 30분 경계의 미래 후보 시작 | 예   | 없음   |
 
 ```json
 {
@@ -739,12 +743,12 @@ if (!response.ok) {
 
 #### Status Code: 200 OK
 
-| 이름 | 타입 | 설명 |
-| --- | --- | --- |
-| promiseId | string(UUID) | 약속 ID |
-| promiseStatus | confirmed | 확정 완료 상태 |
-| currentConfirmation.startAt | string(date-time) | confirmed_start_at에 저장한 시작 |
-| currentConfirmation.endAt | string(date-time) | 시작+현재 duration_minutes; 별도 DB 컬럼 아님 |
+| 이름                        | 타입              | 설명                                          |
+| --------------------------- | ----------------- | --------------------------------------------- |
+| promiseId                   | string(UUID)      | 약속 ID                                       |
+| promiseStatus               | confirmed         | 확정 완료 상태                                |
+| currentConfirmation.startAt | string(date-time) | confirmed_start_at에 저장한 시작              |
+| currentConfirmation.endAt   | string(date-time) | 시작+현재 duration_minutes; 별도 DB 컬럼 아님 |
 
 #### Response Body
 
@@ -761,17 +765,17 @@ if (!response.ok) {
 
 ### 에러
 
-| HTTP 상태 | code | 발생 원인 | message 예시 |
-| --- | --- | --- | --- |
-| 400 | INVALID_REQUEST | UUID·JSON·쿼리·필수값 형식 오류 | 요청 형식을 확인해 주세요. |
-| 401 | UNAUTHENTICATED | 세션 없음·만료·해시 불일치 또는 참여자 비활성 | 다시 로그인해 주세요. |
-| 403 | FORBIDDEN | 다른 약속 소속 또는 방장 권한 부족 | 이 작업을 수행할 권한이 없습니다. |
-| 404 | PROMISE_NOT_FOUND | 약속 없음 | 약속을 찾을 수 없습니다. |
-| 409 | PROMISE_CANCELLED | 약속이 취소됨 | 취소된 약속입니다. |
-| 409 | INVALID_PROMISE_STATE | 이 API에서 허용하지 않는 약속 상태 | 현재 약속 상태에서는 요청할 수 없습니다. |
-| 500 | INTERNAL_ERROR | 서버 오류 | 처리 중 오류가 발생했습니다. |
-| 422 | VALIDATION_FAILED | startAt 날짜·시간 형식이 유효하지 않음 | 확정 시작 시각을 확인해 주세요. |
-| 422 | INVALID_CONFIRMATION_CANDIDATE | 과거 시각·경계 위반·범위 초과·공통 가능 인원 2명 미만 | 후보가 변경되었거나 유효하지 않습니다. 최신 후보를 확인해 주세요. |
+| HTTP 상태 | code                           | 발생 원인                                             | message 예시                                                      |
+| --------- | ------------------------------ | ----------------------------------------------------- | ----------------------------------------------------------------- |
+| 400       | INVALID_REQUEST                | UUID·JSON·쿼리·필수값 형식 오류                       | 요청 형식을 확인해 주세요.                                        |
+| 401       | UNAUTHENTICATED                | 세션 없음·만료·해시 불일치 또는 참여자 비활성         | 다시 로그인해 주세요.                                             |
+| 403       | FORBIDDEN                      | 다른 약속 소속 또는 방장 권한 부족                    | 이 작업을 수행할 권한이 없습니다.                                 |
+| 404       | PROMISE_NOT_FOUND              | 약속 없음                                             | 약속을 찾을 수 없습니다.                                          |
+| 409       | PROMISE_CANCELLED              | 약속이 취소됨                                         | 취소된 약속입니다.                                                |
+| 409       | INVALID_PROMISE_STATE          | 이 API에서 허용하지 않는 약속 상태                    | 현재 약속 상태에서는 요청할 수 없습니다.                          |
+| 500       | INTERNAL_ERROR                 | 서버 오류                                             | 처리 중 오류가 발생했습니다.                                      |
+| 422       | VALIDATION_FAILED              | startAt 날짜·시간 형식이 유효하지 않음                | 확정 시작 시각을 확인해 주세요.                                   |
+| 422       | INVALID_CONFIRMATION_CANDIDATE | 과거 시각·경계 위반·범위 초과·공통 가능 인원 2명 미만 | 후보가 변경되었거나 유효하지 않습니다. 최신 후보를 확인해 주세요. |
 
 #### 오류 응답 예제
 
@@ -781,9 +785,7 @@ if (!response.ok) {
   "message": "확정된 일정은 직접 변경할 수 없습니다.",
   "details": {
     "promiseStatus": "confirmed",
-    "allowedStates": [
-      "closed"
-    ]
+    "allowedStates": ["closed"]
   }
 }
 ```
@@ -803,9 +805,9 @@ if (!response.ok) {
 
 ```javascript
 const response = await fetch(`/api/v1/promises/${promiseId}/confirmation`, {
-  method: 'POST',
-  credentials: 'include',
-  headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+  method: "POST",
+  credentials: "include",
+  headers: { Accept: "application/json", "Content-Type": "application/json" },
   body: JSON.stringify({ startAt }),
 });
 const result = await response.json();
@@ -833,9 +835,9 @@ closed·confirmed 약속을 collecting으로 다시 열고 새 마감과 선택 
 ### 0. 규칙 연결
 
 - 도메인: STATE
-- 관련 규칙: STATE-01-01~02, STATE-06-01, STATE-08-01, STATE-09-02~05, REVIEW-04, REVIEW-14, REVIEW-15
+- 관련 규칙: STATE-01-01~02, STATE-06-01, STATE-08-01, STATE-09-01~05, REVIEW-04, REVIEW-14, REVIEW-15
 - 권한: 현재 active host
-- 허용 상태: closed / confirmed
+- 허용 상태: closed / confirmed (2026-11-11 결정, STATE-09-01). draft·collecting은 409 `INVALID_PROMISE_STATE`
 - 상태 전환: closed / confirmed → collecting
 - 동시성: promises 행 잠금 후 모든 설정·슬롯·제출·확정값 변경을 한 트랜잭션으로 처리
 
@@ -849,17 +851,16 @@ closed·confirmed 약속을 collecting으로 다시 열고 새 마감과 선택 
 
 ### 요청
 
-- `votingDeadlineAt`: 필수. 현재보다 미래이며 적용 후 마지막 후보 날짜 00:00 이전
+- `votingDeadlineAt`: 필수. 현재 시각 + 30분 이상이며 적용 후 날짜 범위 마지막 날 00:00(KST)보다 앞 — 재설정·모집 시작과 같은 규칙(TIME-14-01/02, 2026-11-11 결정)
 - `participantLimit`: 선택. 현재 active 인원 이상이면서 2~30명 범위에서 증가·감소 가능
-- `dateRange`, `dailyTimeRange`, `durationMinutes`: 선택. 생략 시 유지. 날짜 범위 최대 90일. 일일 시작은 00:00~23:30, 종료는 00:30~24:00의 30분 경계이며 서버는 분 값으로 변환
-
-> ⚠️ 비즈니스 규칙 STATE-03-01은 "오늘부터 3개월"로 규정. 불일치 — 팀 확인 필요.
+- `dateRange`: 선택. 생략 시 유지. 오늘(KST)부터, 양 끝 포함 최대 90일
+- `dailyTimeRange`, `durationMinutes`: 받지 않는다. MVP 고정(2026-11-11 결정, STATE-03-01)
 
 ```json
 {
-  "votingDeadlineAt":"2026-10-21T18:00:00+09:00",
-  "participantLimit":10,
-  "dateRange":{"startDate":"2026-10-20","endDate":"2026-11-07"}
+  "votingDeadlineAt": "2026-10-21T18:00:00+09:00",
+  "participantLimit": 10,
+  "dateRange": { "startDate": "2026-10-20", "endDate": "2026-11-07" }
 }
 ```
 
@@ -867,10 +868,16 @@ closed·confirmed 약속을 collecting으로 다시 열고 새 마감과 선택 
 
 ```json
 {
-  "promiseId":"7c1b2f40-808a-4f31-8a27-d849330dd123",
-  "promiseStatus":"collecting",
-  "currentConfirmation":null,
-  "changeImpact":{"hasAddedSelectableSlots":true,"submissionsReset":true,"removedSlotCount":0,"versionChangedParticipantCount":5,"confirmationCleared":true}
+  "promiseId": "7c1b2f40-808a-4f31-8a27-d849330dd123",
+  "promiseStatus": "collecting",
+  "currentConfirmation": null,
+  "changeImpact": {
+    "hasAddedSelectableSlots": true,
+    "submissionsReset": true,
+    "removedSlotCount": 0,
+    "versionChangedParticipantCount": 5,
+    "confirmationCleared": true
+  }
 }
 ```
 
@@ -894,12 +901,12 @@ closed·confirmed 약속을 collecting으로 다시 열고 새 마감과 선택 
 ### 처리 순서
 
 1. promiseId 형식과 약속 존재 여부를 확인한다. 약속이 cancelled이면 세션 인증보다 우선하여 `409 PROMISE_CANCELLED`를 반환한다. 그다음 세션을 인증하고 promises 행을 잠근 뒤 취소 상태·최신 active host·closed 또는 confirmed 상태를 다시 확인한다.
-2. 새 설정과 현재보다 미래인 `votingDeadlineAt`을 검증한다.
+2. 새 설정과 `votingDeadlineAt`(현재+30분 이상, 마지막 날 00:00 KST 미만)을 검증한다.
 3. confirmed에서 재조율하는 경우 `confirmed_start_at=NULL`로 변경한다. 현재 ERD에는 과거 확정 이력 저장 구조가 없다.
 4. 이전 선택 가능 슬롯 집합 A와 변경 후 집합 B를 계산하고, 새 범위 밖의 기존 슬롯만 삭제한다. 범위 안 슬롯은 유지한다.
 5. `B-A`가 비어 있는 축소만 발생하면 제출 상태를 유지한다. 축소로 실제 슬롯이 삭제된 참여자의 `availability_version`만 1 증가시키며, 실제 슬롯이 삭제되지 않은 참여자의 버전은 변경하지 않는다.
 6. `B-A`가 하나라도 있는 확대·이동이면 모든 active 참여자의 `availability_submitted_at=NULL` 처리와 `availability_version+1`을 수행한다. 제출 시각이 이미 NULL이어도 버전을 증가시킨다.
-7. 범위를 변경하지 않았거나 소요 시간만 변경한 경우 슬롯·제출 상태·버전을 유지하고 후보만 새 길이로 계산한다. 설정 전용 버전은 두지 않으며 참여자 화면은 STATE-API-01의 settings 전체를 주기적으로 비교한다.
+7. 범위를 변경하지 않은 경우 슬롯·제출 상태·버전을 유지한다. 설정 전용 버전은 두지 않으며 참여자 화면은 STATE-API-01의 settings 전체를 주기적으로 비교한다.
 8. `status=collecting`과 새 마감을 저장한다. 빈자리가 있으면 정원을 바꾸지 않아도 신규 참여를 허용한다.
 9. active 참여자의 현재 유효한 세션만 새 `votingDeadlineAt+7일`로 갱신한다. 이미 만료됐거나 cancelled 참여자에게 속한 세션은 다시 활성화하지 않는다.
 
@@ -921,9 +928,9 @@ closed·confirmed 약속을 collecting으로 다시 열고 새 마감과 선택 
 ### 0. 규칙 연결
 
 - 도메인: STATE
-- 관련 규칙: STATE-01-02, STATE-10-01, REVIEW-03, REVIEW-16
+- 관련 규칙: STATE-01-02, STATE-10-01~03, REVIEW-03, REVIEW-16
 - 권한: 현재 active host
-- 허용 상태: draft / collecting / closed / confirmed
+- 허용 상태: collecting / closed / confirmed (2026-11-11 결정, STATE-10-02). draft는 409 `INVALID_PROMISE_STATE`이며, 초안은 방장 나가기(STATE-API-08)로 삭제한다
 - 상태 전환: 취소 전 상태 → cancelled
 - 동시성: promises 행 잠금 후 상태 변경과 전체 세션 만료를 한 트랜잭션으로 처리
 
@@ -944,10 +951,10 @@ closed·confirmed 약속을 collecting으로 다시 열고 새 마감과 선택 
 
 ```json
 {
-  "promiseId":"7c1b2f40-808a-4f31-8a27-d849330dd123",
-  "promiseStatus":"cancelled",
-  "cancelledAt":"2026-10-27T20:30:00+09:00",
-  "message":"취소된 약속입니다."
+  "promiseId": "7c1b2f40-808a-4f31-8a27-d849330dd123",
+  "promiseStatus": "cancelled",
+  "cancelledAt": "2026-10-27T20:30:00+09:00",
+  "message": "취소된 약속입니다."
 }
 ```
 
@@ -993,9 +1000,9 @@ closed·confirmed 약속을 collecting으로 다시 열고 새 마감과 선택 
 ### 0. 규칙 연결
 
 - 도메인: STATE / MEMBER 연동
-- 관련 규칙: STATE-06-01~02, MEMBER-10-03, MEMBER-12-01·03·04, REVIEW-11~13·17
+- 관련 규칙: STATE-06-01~02, MEMBER-10-01·03, MEMBER-12-01·03·04, REVIEW-11~13·17
 - 권한: 해당 약속의 active 참여자
-- 허용 상태: draft / collecting / closed / confirmed. cancelled는 거부
+- 허용 상태: collecting / closed / confirmed, 그리고 draft의 방장(초안 삭제). cancelled는 거부 (2026-11-11 결정, MEMBER-10-01)
 - 상태 전환: 일반 참여자와 후임자가 있는 방장의 탈퇴는 참여자 상태를 cancelled로 변경한다. 후임자가 없는 마지막 방장의 탈퇴 요청은 참여자 탈퇴를 완료하지 않고 약속 cancelled로 전환한다.
 - 동시성: promises 행 잠금 후 후임자 존재 여부, 방장 자동 승계, 조건부 참여자 상태 변경, 약속 취소 및 세션 만료를 한 트랜잭션으로 처리
 
@@ -1016,13 +1023,13 @@ closed·confirmed 약속을 collecting으로 다시 열고 새 마감과 선택 
 
 ```json
 {
-  "promiseId":"7c1b2f40-808a-4f31-8a27-d849330dd123",
-  "promiseStatus":"confirmed",
-  "participantStatus":"cancelled",
-  "participantCancelledAt":"2026-10-27T20:30:00+09:00",
-  "hostTransferred":false,
-  "newHostParticipantId":null,
-  "promiseCancelledAt":null
+  "promiseId": "7c1b2f40-808a-4f31-8a27-d849330dd123",
+  "promiseStatus": "confirmed",
+  "participantStatus": "cancelled",
+  "participantCancelledAt": "2026-10-27T20:30:00+09:00",
+  "hostTransferred": false,
+  "newHostParticipantId": null,
+  "promiseCancelledAt": null
 }
 ```
 
@@ -1030,13 +1037,13 @@ closed·confirmed 약속을 collecting으로 다시 열고 새 마감과 선택 
 
 ```json
 {
-  "promiseId":"7c1b2f40-808a-4f31-8a27-d849330dd123",
-  "promiseStatus":"cancelled",
-  "participantStatus":"active",
-  "participantCancelledAt":null,
-  "hostTransferred":false,
-  "newHostParticipantId":null,
-  "promiseCancelledAt":"2026-10-27T20:30:00+09:00"
+  "promiseId": "7c1b2f40-808a-4f31-8a27-d849330dd123",
+  "promiseStatus": "cancelled",
+  "participantStatus": "active",
+  "participantCancelledAt": null,
+  "hostTransferred": false,
+  "newHostParticipantId": null,
+  "promiseCancelledAt": "2026-10-27T20:30:00+09:00"
 }
 ```
 
@@ -1070,21 +1077,18 @@ closed·confirmed 약속을 collecting으로 다시 열고 새 마감과 선택 
 
 1. `promiseId` 형식과 약속 존재 여부를 확인한다. 요청이 시작될 때 약속이 이미 cancelled이면 세션 인증보다 우선하여 `409 PROMISE_CANCELLED`를 반환한다.
 2. 세션에서 요청자를 확인하고 promises 행을 잠근 뒤 요청자가 `status=active`인지와 최신 role을 다시 확인한다.
-3. 약속이 `draft`면 초안 폐기로 처리한다. `promise_link_id`를 잠금 없이 읽고 promise_links → promises 순서로 다시 잠근 뒤 여전히 `draft`인지 확인한다. 세션 → 방장 참여자 → promise 순서로 물리 삭제하고 쿠키를 제거한다. 링크는 미사용 상태로 남는다. 이후 3번 이하는 실행하지 않는다.
-
-> ⚠️ 원본 그대로 옮김. "이후 3번 이하는 실행하지 않는다"는 3번 항목 자신을 가리켜 번호가 어긋나 보인다 — 확인 필요.
-
+3. 약속이 `draft`면 초안 폐기로 처리한다. `promise_link_id`를 잠금 없이 읽고 promise_links → promises 순서로 다시 잠근 뒤 여전히 `draft`인지 확인한다. 세션 → 방장 참여자 → promise 순서로 물리 삭제하고 쿠키를 제거한다. 링크는 미사용 상태로 남는다. 이후 4번 이하는 실행하지 않는다.
 4. 요청자가 일반 참여자이면 `participants.status=cancelled`, `participants.cancelled_at=clock_timestamp()`로 변경한다. 닉네임·PIN 해시·가능 슬롯·제출 시각·`availability_version`은 보존하고 관련 세션을 즉시 만료한다.
 5. 요청자가 방장이면 본인을 제외한 active 참여자 중 `created_at ASC, id ASC` 첫 사람을 후임 방장으로 정한다. 제출 여부는 승계 조건으로 사용하지 않는다.
 6. 후임자가 있으면 같은 트랜잭션에서 기존 방장을 `role=member, status=cancelled, cancelled_at=clock_timestamp()`, 새 방장을 `role=host, status=active`로 변경하고 기존 방장의 모든 세션을 즉시 만료한다. 하나라도 실패하면 전체 롤백한다.
 7. 후임자가 없으면 마지막 방장의 참여자 탈퇴를 완료하지 않고 약속 전체 취소로 전환한다. 기존 방장의 `role=host`, `status=active`, `cancelled_at=NULL`은 변경하지 않고 약속만 `status=cancelled, cancelled_at=clock_timestamp()`로 변경한다. 약속 취소 정책에 따라 해당 약속의 모든 참여자 세션을 즉시 만료하고 응답 쿠키를 제거한다.
-8. 6번은 이미 cancelled인 약속에서 탈퇴를 허용하는 규칙이 아니다. 요청 시작 시점에는 약속이 취소되지 않았고, 잠금 후 후임자가 없다는 사실을 확인한 결과 탈퇴 요청이 약속 취소로 원자적으로 전환되는 예외다.
-9. 참여자 탈퇴가 완료된 3번·5번에서는 탈퇴자를 정원·후보·가능 인원·참석자 등 모든 active 집계에서 제외한다. 6번에서는 약속 자체가 cancelled이므로 이후 집계·조회·수정 기능을 제공하지 않는다.
-10. closed에서 3번·5번의 탈퇴가 완료되면 약속 상태를 유지하고 다음 공식 후보 조회에서 최신 active 참여자를 기준으로 다시 계산한다.
-11. confirmed에서 3번·5번의 탈퇴가 완료되면 약속 상태와 `confirmed_start_at`을 유지하고 참석자 명단을 최신 active 참여자 기준으로 갱신한다.
+8. 7번은 이미 cancelled인 약속에서 탈퇴를 허용하는 규칙이 아니다. 요청 시작 시점에는 약속이 취소되지 않았고, 잠금 후 후임자가 없다는 사실을 확인한 결과 탈퇴 요청이 약속 취소로 원자적으로 전환되는 예외다.
+9. 참여자 탈퇴가 완료된 4번·6번에서는 탈퇴자를 정원·후보·가능 인원·참석자 등 모든 active 집계에서 제외한다. 7번에서는 약속 자체가 cancelled이므로 이후 집계·조회·수정 기능을 제공하지 않는다.
+10. closed에서 4번·6번의 탈퇴가 완료되면 약속 상태를 유지하고 다음 공식 후보 조회에서 최신 active 참여자를 기준으로 다시 계산한다.
+11. confirmed에서 4번·6번의 탈퇴가 완료되면 약속 상태와 `confirmed_start_at`을 유지하고 참석자 명단을 최신 active 참여자 기준으로 갱신한다.
 12. 확정 시간 참석 가능 인원이 2명 미만이어도 자동 확정 해제·자동 취소하지 않는다. STATE-API-01의 `hostActionRequired`로 방장에게 재조율·취소를 안내한다.
 
-> ⚠️ 8~11번이 참조하는 "3번·5번·6번"의 번호가 실제 항목(4·6·7번)과 어긋난다. 원본 그대로 보존 — 팀 확인 필요.
+> 2026-11-11 결정(X-11): 처리 순서 안의 번호 참조를 실제 항목(4·6·7번)에 맞게 고쳤다.
 
 ### 보안 정보
 
@@ -1099,75 +1103,7 @@ closed·confirmed 약속을 collecting으로 다시 열고 새 마감과 선택 
 
 > 원본 DB의 `endpoint` 필드는 `내부 공통 가드`, `설명`은 "참여·탈퇴·내보내기·입력·제출 API에 공통 상태·마감·재조율 제한을 적용한다."
 >
-> ⚠️ **미완성/불일치 — 확인 필요.** 제목·설명은 MEMBER·TIME 공통 상태 가드이지만, 본문 1~4절은 STATE-API-08(본인 탈퇴와 자동 승계)의 내용이 그대로 복사되어 있다. 「참여·탈퇴·내보내기·입력·제출 API에 적용할 공통 가드」 자체의 명세는 원본에 아직 작성되어 있지 않다. 아래는 원본 본문 그대로다.
-
-### 0. 규칙 연결
-
-- 도메인: STATE / MEMBER 연동
-- 관련 규칙: STATE-06-01~02, MEMBER-10-03, MEMBER-12-01·03·04, REVIEW-11~13·17
-- 권한: 해당 약속의 active 참여자
-- 허용 상태: draft / collecting / closed / confirmed. cancelled는 거부
-- 상태 전환: 일반 참여자와 후임자가 있는 방장의 탈퇴는 참여자 상태를 cancelled로 변경한다. 후임자가 없는 마지막 방장의 탈퇴 요청은 참여자 탈퇴를 완료하지 않고 약속 cancelled로 전환한다.
-- 동시성: promises 행 잠금 후 후임자 존재 여부, 자동 승계, 조건부 참여자 상태 변경, 약속 취소 및 세션 만료를 한 트랜잭션으로 처리한다.
-
-### 1. 기본 정보
-
-- **목적:** 본인이 약속에서 탈퇴한다. 마감·확정 후에도 허용하며 데이터를 물리 삭제하지 않는다. 단, 후임자가 없는 마지막 방장의 요청은 방장 참여자 상태를 유지한 채 약속 전체 취소로 전환한다
-- **HTTP Method:** DELETE
-- **Endpoint:** `/api/v1/promises/{promiseId}/participants/me`
-- **Authentication Required:** 예
-
-### 요청
-
-본문과 participantId를 받지 않는다. 세션 참여자 본인만 처리한다.
-
-### 응답
-
-```json
-{
-"promiseId": "7c1b2f40-808a-4f31-8a27-d849330dd123",
-"promiseStatus": "cancelled",
-"participantStatus": "active",
-"participantCancelledAt": null,
-"hostTransferred": false,
-"newHostParticipantId": null,
-"promiseCancelledAt": "2026-10-27T20:30:00+09:00"
-}
-```
-
-### 에러
-
-#### 공통 오류
-
-- `400 INVALID_REQUEST`: UUID·JSON·필드 형식 오류
-- `401 UNAUTHENTICATED`: 세션 없음·만료·해시 불일치 또는 참여자 비활성
-- `403 FORBIDDEN`: 다른 약속 소속 또는 권한 부족
-- `404 PROMISE_NOT_FOUND`: 약속 없음
-- `409 PROMISE_CANCELLED`: 약속이 취소됨
-- `409 INVALID_PROMISE_STATE`: 현재 상태에서 허용되지 않는 요청
-- `422 VALIDATION_FAILED`: 값이 비즈니스 규칙을 위반
-- `500 INTERNAL_ERROR`: 서버 오류
-
-### 처리 순서
-
-1. `promiseId` 형식과 약속 존재 여부를 확인한다. 요청 시작 시 약속이 이미 cancelled이면 세션 인증보다 우선하여 `409 PROMISE_CANCELLED`를 반환한다.
-2. 세션에서 요청자를 확인하고 promises 행을 잠근 뒤 요청자가 `status=active`인지와 최신 role을 다시 확인한다.
-3. 요청자가 일반 참여자이면 `status=cancelled`, `cancelled_at=clock_timestamp()`로 변경한다. 닉네임·PIN 해시·가능 슬롯·제출 기록은 보존하고 관련 세션을 즉시 만료한다.
-4. 요청자가 방장이면 본인을 제외한 active 참여자 중 `created_at ASC, id ASC` 첫 사람을 후임자로 선정한다.
-5. 후임자가 있으면 기존 방장을 `role=member`, `status=cancelled`, `cancelled_at=clock_timestamp()`로 변경하고 새 방장을 `role=host`, `status=active`로 변경한다. 기존 방장의 세션을 즉시 만료하며, 하나라도 실패하면 전체 롤백한다.
-6. 후임자가 없으면 방장의 참여자 탈퇴를 완료하지 않고 약속 전체 취소로 전환한다. 방장의 `role=host`, `status=active`, `cancelled_at=NULL`은 그대로 두고 약속만 `status=cancelled`, `cancelled_at=clock_timestamp()`로 변경한다.
-7. 6번에서는 약속의 모든 참여자 세션을 즉시 만료하고 응답 쿠키를 제거한다.
-8. 6번은 이미 cancelled인 약속에서 탈퇴를 허용한다는 뜻이 아니다. 취소되지 않은 약속에서 시작된 마지막 방장의 탈퇴 요청이 약속 취소로 전환되는 예외다.
-9. 일반 참여자 또는 승계 후 기존 방장의 탈퇴가 완료되면 탈퇴자를 모든 active 집계에서 제외한다.
-10. closed에서 탈퇴가 완료되면 약속 상태를 유지하고 후보를 최신 active 참여자 기준으로 다시 계산한다.
-11. confirmed에서 탈퇴가 완료되면 약속 상태와 `confirmed_start_at`을 유지하고 참석자 명단만 갱신한다. 참석 가능 인원이 2명 미만이어도 자동 확정 해제·자동 취소하지 않는다.
-
-### 보안 정보
-
-- 약속별 HttpOnly 세션 쿠키 `ys_session_{promiseId}`를 사용하고 서버는 `session_token_hash`로 검증한다.
-- 요청의 `participantId`, `role`, `isHost`를 신뢰하지 않고 세션 참여자의 최신 `status=active`와 `role`을 잠금 후 다시 확인한다.
-- 변경 요청은 HTTPS와 허용 Origin 검증을 사용하고 응답은 `Cache-Control: no-store`로 제공한다.
-- PIN·세션 원문·다른 참여자의 개별 슬롯을 응답이나 로그에 노출하지 않는다.
+> 2026-11-11 결정(X-10): 원본 본문은 STATE-API-08(본인 탈퇴와 자동 승계)의 복사본이었으므로 지웠다. 엔드포인트가 아닌 공통 가드이며 별도 명세는 두지 않는다. 공통 상태·마감 판정은 STATE-API-00의 「취소 상태 오류」「요청 시 상태·마감 판정」「effectiveStatus」를, 각 API의 허용 상태는 해당 API의 0절을 따른다. 본인 탈퇴는 STATE-API-08, 참여자 내보내기는 MEMBER-API-08이다.
 
 ---
 
@@ -1205,23 +1141,23 @@ closed·confirmed 약속을 collecting으로 다시 열고 새 마감과 선택 
 
 #### 헤더
 
-| Name | Value | 필수 |
-| --- | --- | --- |
-| Cookie | ys_session_{promiseId}=… | 예 |
-| Accept | application/json | 권장 |
+| Name   | Value                    | 필수 |
+| ------ | ------------------------ | ---- |
+| Cookie | ys_session_{promiseId}=… | 예   |
+| Accept | application/json         | 권장 |
 
 #### Path Parameter
 
-| 이름 | 타입 | 설명 | 필수 |
-| --- | --- | --- | --- |
-| promiseId | string(UUID) | 초대 링크 조회나 방장 등록으로 받은 약속 ID | 예 |
+| 이름      | 타입         | 설명                                        | 필수 |
+| --------- | ------------ | ------------------------------------------- | ---- |
+| promiseId | string(UUID) | 초대 링크 조회나 방장 등록으로 받은 약속 ID | 예   |
 
 #### Query Parameter
 
-| 이름 | 타입 | 설명 | 필수 | 기본값 |
-| --- | --- | --- | --- | --- |
-| limit | integer | 1~5. 한 번에 반환할 개수 | 아니오 | 5 |
-| offset | integer | 0 이상의 결과 시작 위치 | 아니오 | 0 |
+| 이름   | 타입    | 설명                     | 필수   | 기본값 |
+| ------ | ------- | ------------------------ | ------ | ------ |
+| limit  | integer | 1~5. 한 번에 반환할 개수 | 아니오 | 5      |
+| offset | integer | 0 이상의 결과 시작 위치  | 아니오 | 0      |
 
 #### Request Body
 
@@ -1231,18 +1167,18 @@ closed·confirmed 약속을 collecting으로 다시 열고 새 마감과 선택 
 
 #### Status Code: 200 OK
 
-| 이름 | 타입 | 설명 |
-| --- | --- | --- |
-| promiseId | string(UUID) | 약속 ID |
-| promiseStatus | closed | 현재 시각을 반영해 계산한 effectiveStatus. DB status는 collecting일 수 있음 |
-| calculatedAt | string(date-time) | 이번 후보 계산의 서버 기준 시각 |
-| limit / offset | integer | 적용한 페이지 요청 |
-| total | integer | 이 시각의 전체 유효 후보 개수 |
-| hasMore | boolean | 추가 후보 여부 |
-| nextOffset | integer 또는 null | 추가 요청 위치; 없으면 null |
-| candidates | array | 이번 페이지의 후보 |
-| candidates[].startAt / endAt | string(date-time) | 미래 시작 / 시작+소요 시간 |
-| candidates[].availableParticipantCount | integer | 전체 연속 구간 공통 가능 인원, 2 이상 |
+| 이름                                   | 타입              | 설명                                                                        |
+| -------------------------------------- | ----------------- | --------------------------------------------------------------------------- |
+| promiseId                              | string(UUID)      | 약속 ID                                                                     |
+| promiseStatus                          | closed            | 현재 시각을 반영해 계산한 effectiveStatus. DB status는 collecting일 수 있음 |
+| calculatedAt                           | string(date-time) | 이번 후보 계산의 서버 기준 시각                                             |
+| limit / offset                         | integer           | 적용한 페이지 요청                                                          |
+| total                                  | integer           | 이 시각의 전체 유효 후보 개수                                               |
+| hasMore                                | boolean           | 추가 후보 여부                                                              |
+| nextOffset                             | integer 또는 null | 추가 요청 위치; 없으면 null                                                 |
+| candidates                             | array             | 이번 페이지의 후보                                                          |
+| candidates[].startAt / endAt           | string(date-time) | 미래 시작 / 시작+소요 시간                                                  |
+| candidates[].availableParticipantCount | integer           | 전체 연속 구간 공통 가능 인원, 2 이상                                       |
 
 #### Response Body
 
@@ -1284,16 +1220,16 @@ closed·confirmed 약속을 collecting으로 다시 열고 새 마감과 선택 
 
 ### 에러
 
-| HTTP 상태 | code | 발생 원인 | message 예시 |
-| --- | --- | --- | --- |
-| 400 | INVALID_REQUEST | UUID·JSON·쿼리·필수값 형식 오류 | 요청 형식을 확인해 주세요. |
-| 401 | UNAUTHENTICATED | 세션 없음·만료·해시 불일치 또는 참여자 비활성 | 다시 로그인해 주세요. |
-| 403 | FORBIDDEN | 다른 약속 소속 또는 방장 권한 부족 | 이 작업을 수행할 권한이 없습니다. |
-| 404 | PROMISE_NOT_FOUND | 약속 없음 | 약속을 찾을 수 없습니다. |
-| 409 | PROMISE_CANCELLED | 약속이 취소됨 | 취소된 약속입니다. |
-| 409 | INVALID_PROMISE_STATE | 이 API에서 허용하지 않는 약속 상태 | 현재 약속 상태에서는 요청할 수 없습니다. |
-| 500 | INTERNAL_ERROR | 서버 오류 | 처리 중 오류가 발생했습니다. |
-| 422 | VALIDATION_FAILED | limit이 1~5가 아니거나 offset이 음수·정수가 아님 | 후보 조회 범위를 확인해 주세요. |
+| HTTP 상태 | code                  | 발생 원인                                        | message 예시                             |
+| --------- | --------------------- | ------------------------------------------------ | ---------------------------------------- |
+| 400       | INVALID_REQUEST       | UUID·JSON·쿼리·필수값 형식 오류                  | 요청 형식을 확인해 주세요.               |
+| 401       | UNAUTHENTICATED       | 세션 없음·만료·해시 불일치 또는 참여자 비활성    | 다시 로그인해 주세요.                    |
+| 403       | FORBIDDEN             | 다른 약속 소속 또는 방장 권한 부족               | 이 작업을 수행할 권한이 없습니다.        |
+| 404       | PROMISE_NOT_FOUND     | 약속 없음                                        | 약속을 찾을 수 없습니다.                 |
+| 409       | PROMISE_CANCELLED     | 약속이 취소됨                                    | 취소된 약속입니다.                       |
+| 409       | INVALID_PROMISE_STATE | 이 API에서 허용하지 않는 약속 상태               | 현재 약속 상태에서는 요청할 수 없습니다. |
+| 500       | INTERNAL_ERROR        | 서버 오류                                        | 처리 중 오류가 발생했습니다.             |
+| 422       | VALIDATION_FAILED     | limit이 1~5가 아니거나 offset이 음수·정수가 아님 | 후보 조회 범위를 확인해 주세요.          |
 
 #### 오류 응답 예제
 
@@ -1303,9 +1239,7 @@ closed·confirmed 약속을 collecting으로 다시 열고 새 마감과 선택 
   "message": "응답 마감 후 후보를 조회할 수 있습니다.",
   "details": {
     "promiseStatus": "collecting",
-    "allowedStates": [
-      "closed"
-    ]
+    "allowedStates": ["closed"]
   }
 }
 ```
@@ -1327,9 +1261,9 @@ closed·confirmed 약속을 collecting으로 다시 열고 새 마감과 선택 
 
 ```javascript
 const response = await fetch(`/api/v1/promises/${promiseId}/candidates?limit=5&offset=0`, {
-  method: 'GET',
-  credentials: 'include',
-  headers: { Accept: 'application/json' },
+  method: "GET",
+  credentials: "include",
+  headers: { Accept: "application/json" },
 });
 const result = await response.json();
 if (!response.ok) {
