@@ -246,3 +246,19 @@ export async function leavePromise(client: TestClient, promiseId: string) {
     params: { promiseId },
   });
 }
+
+// --- 내보내기(약속 관리 티켓 07) ---
+
+export async function removeParticipant(
+  client: TestClient,
+  promiseId: string,
+  participantId: string,
+) {
+  const { DELETE } =
+    await import("@/app/api/v1/promises/[promiseId]/participants/[participantId]/route");
+  return client.request(DELETE, {
+    method: "DELETE",
+    path: `/api/v1/promises/${promiseId}/participants/${participantId}`,
+    params: { promiseId, participantId },
+  });
+}

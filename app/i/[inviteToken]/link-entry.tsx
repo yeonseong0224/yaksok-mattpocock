@@ -18,6 +18,7 @@ import {
 import { CreatePromiseButton } from "@/app/create-promise-button";
 import { ConfirmedView } from "./confirmed-view";
 import { ReopenDialog } from "./reopen-dialog";
+import { forgetLogin, membershipEnded, rememberLogin } from "./login-memory";
 import { HostRegistrationForm } from "./host-registration-form";
 import { InviteLink } from "./invite-link";
 import { JoinPanel } from "./join-panel";
@@ -66,6 +67,15 @@ export function LinkEntry({ inviteToken }: { inviteToken: string }) {
     await mutate(() => true, undefined, { revalidate: true });
   }, [mutate]);
   const expire = useCallback(() => setExpiredByClock(true), []);
+
+  // 로그인해 있는 동안 세션 만료 시각을 기억한다. 나중에 401이 오면 내보내진 것인지 가려낸다(티켓 07).
+  const sessionExpiresAt = promiseId && me.data ? me.data.sessionExpiresAt : null;
+  useEffect(() => {
+    if (promiseId && sessionExpiresAt) rememberLogin(promiseId, sessionExpiresAt);
+  }, [promiseId, sessionExpiresAt]);
+  const forgetShownLogin = useCallback(() => {
+    if (promiseId) forgetLogin(promiseId);
+  }, [promiseId]);
 
   // 어느 요청에서든 "취소된 약속" 응답을 받으면 링크를 다시 읽어 취소 화면으로 바꾼다(폴링 포함, 티켓 05).
   const revalidateLink = link.mutate;
@@ -127,6 +137,12 @@ export function LinkEntry({ inviteToken }: { inviteToken: string }) {
         canRegister={status === "collecting"}
         onJoined={refresh}
         onPromiseChanged={refresh}
+        notice={
+          membershipEnded(promiseId)
+            ? "방장이 이 약속에서 내보냈어요. 같은 닉네임으로는 다시 참여할 수 없어요. (다른 기기에서 직접 나갔다면 이 안내는 무시해 주세요.)"
+            : undefined
+        }
+        onNoticeShown={forgetShownLogin}
       />
     );
   }

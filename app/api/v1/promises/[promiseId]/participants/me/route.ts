@@ -2,12 +2,8 @@ import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { rejectForeignOrigin } from "@/lib/api/origin";
 import { invalidRequest, noStore } from "@/lib/api/responses";
-import {
-  authenticate,
-  clearSessionCookie,
-  expireAllSessions,
-  expireParticipantSessions,
-} from "@/lib/members/session";
+import { authenticate, clearSessionCookie, expireAllSessions } from "@/lib/members/session";
+import { endMembership } from "@/lib/members/membership";
 import { promiseCancelled, promiseNotFound, unauthenticated } from "@/lib/promises/errors";
 import {
   deleteDraft,
@@ -87,16 +83,11 @@ export async function DELETE(
       newHostParticipantId = successor.id;
     }
 
-    // 닉네임·PIN·슬롯·제출 시각·버전은 보존한다. active가 아니므로 정원·후보·참석 명단에서 빠진다.
     // 약속당 방장은 한 명이라(유니크 인덱스) 나가는 방장을 먼저 member로 내린 뒤 후임을 올린다.
-    await tx.participant.update({
-      where: { id: me.id },
-      data: { status: "cancelled", cancelledAt: now, role: "member" },
-    });
+    await endMembership(tx, me.id, now);
     if (newHostParticipantId) {
       await tx.participant.update({ where: { id: newHostParticipantId }, data: { role: "host" } });
     }
-    await expireParticipantSessions(tx, me.id, now);
     return {
       kind: "left",
       promiseStatus: effectiveStatus(promise),

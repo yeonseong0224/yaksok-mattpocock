@@ -89,6 +89,11 @@ export function AvailabilityBoard({
   });
   const data = availability.data;
   const { mutate: mutateAll } = useSWRConfig();
+  // 폴링 중 로그인이 끊기면(내보내짐 등) 바로 로그인 화면으로 보낸다. 이유 안내는 링크 화면이 한다(티켓 07).
+  const sessionLost = availability.error?.status === 401;
+  useEffect(() => {
+    if (sessionLost) onSessionLost();
+  }, [sessionLost, onSessionLost]);
 
   // 제출하지 않은 내 선택. null이면 고친 것이 없어 서버에 제출된 값을 그대로 보여준다.
   // 새로고침해도 남도록 이 브라우저에 저장된 값에서 시작하고, 바뀔 때마다 저장한다(TIME-10-01).
