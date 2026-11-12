@@ -13,6 +13,7 @@ import {
   type StartSettingsInput,
 } from "@/lib/promises/start-settings";
 import { kstDate, toKstIso } from "@/lib/time";
+import { ApiError } from "./api";
 import { RangeCalendar, type DateRange } from "./range-calendar";
 
 // 약속 설정 입력칸(이름, 날짜 범위 달력, 정원, 마감). 모집 시작 폼(Figma 01~03)과 재설정 폼이 함께 쓴다.
@@ -34,6 +35,27 @@ export type Deadline = { date: string; time: string };
 export function splitKst(date: Date): Deadline {
   const iso = toKstIso(date);
   return { date: iso.slice(0, 10), time: iso.slice(11, 16) };
+}
+
+/** 범위를 줄일 때의 일반 경고(STATE-API-03 범위 축소 확인) */
+export const SHRINK_WARNING =
+  "범위를 줄이면 제외되는 날짜·시간의 기존 입력이 삭제됩니다. 변경할까요?";
+
+/** 기존 날짜가 하나라도 빠지는가. 화면의 입력 목록은 늦을 수 있어 날짜로만 판단한다. */
+export function rangeShrinks(
+  current: { dateRangeStart: string; dateRangeEnd: string },
+  next: StartSettingsInput["dateRange"],
+): boolean {
+  return next.startDate > current.dateRangeStart || next.endDate < current.dateRangeEnd;
+}
+
+/** 저장 실패 → 칸별 오류. 422면 서버가 준 오류 목록을, 그 밖에는 폼 전체 오류 한 줄을 쓴다. */
+export function errorsFromFailure(error: unknown, fallback: string): SettingsErrors {
+  if (error instanceof ApiError && error.status === 422) {
+    const list = (error.details?.errors as SettingsError[] | undefined) ?? [];
+    if (list.length > 0) return toErrors(list);
+  }
+  return { form: error instanceof ApiError ? error.message : fallback };
 }
 
 export type SettingsValues = {

@@ -235,3 +235,15 @@ export function parseSettingsPatchBody(
   }
   return patch;
 }
+
+/**
+ * 재조율 요청 본문(STATE-API-06): 새 마감은 필수, 약속 이름·날짜 범위·정원은 선택(생략하면 유지).
+ * 하루 시간 범위·약속 길이는 무시한다. 형식이 어긋나면 null.
+ */
+export function parseReopenBody(
+  body: Record<string, unknown>,
+): (Partial<StartSettingsInput> & { votingDeadlineAt: string }) | null {
+  const patch = parseSettingsPatchBody(body);
+  const votingDeadlineAt = patch?.votingDeadlineAt;
+  return votingDeadlineAt ? { ...patch, votingDeadlineAt } : null;
+}

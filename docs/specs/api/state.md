@@ -859,6 +859,7 @@ closed·confirmed 약속을 collecting으로 다시 열고 새 마감과 선택 
 ### 요청
 
 - `votingDeadlineAt`: 필수. 현재 시각 + 30분 이상이며 적용 후 날짜 범위 마지막 날 00:00(KST)보다 앞 — 재설정·모집 시작과 같은 규칙(TIME-14-01/02, 2026-11-11 결정)
+- `title`: 선택. 생략 시 유지. 1~30자(2026-11-12 결정)
 - `participantLimit`: 선택. 현재 active 인원 이상이면서 2~30명 범위에서 증가·감소 가능
 - `dateRange`: 선택. 생략 시 유지. 오늘(KST)부터, 양 끝 포함 최대 90일
 - `dailyTimeRange`, `durationMinutes`: 받지 않는다. MVP 고정(2026-11-11 결정, STATE-03-01)
@@ -877,16 +878,24 @@ closed·confirmed 약속을 collecting으로 다시 열고 새 마감과 선택 
 {
   "promiseId": "7c1b2f40-808a-4f31-8a27-d849330dd123",
   "promiseStatus": "collecting",
+  "settings": { "...": "STATE-API-03 응답의 settings와 같은 모양" },
   "currentConfirmation": null,
   "changeImpact": {
+    "rangeChanged": true,
     "hasAddedSelectableSlots": true,
     "submissionsReset": true,
     "removedSlotCount": 0,
+    "removedSlotParticipantCount": 0,
     "versionChangedParticipantCount": 5,
+    "submissionsResetParticipantCount": 4,
+    "hasCandidates": true,
     "confirmationCleared": true
   }
 }
 ```
+
+- (2026-11-12 구현, 약속 관리 티켓 04) `changeImpact`는 STATE-API-03과 같은 필드에 `confirmationCleared`를 더한 것이다. 응답에 `settings`를 함께 준다.
+- `title`도 선택으로 받는다(2026-11-12 결정: 재조율 폼도 재설정처럼 약속 이름을 바꿀 수 있다). 마감 시각이 지났지만 아직 DB가 collecting인 약속은 closed로 보고 다시 연다(ADR-0001).
 
 ### 에러
 

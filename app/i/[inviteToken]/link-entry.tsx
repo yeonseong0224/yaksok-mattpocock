@@ -15,12 +15,14 @@ import {
   type PromiseView,
 } from "./api";
 import { ConfirmedView } from "./confirmed-view";
+import { ReopenDialog } from "./reopen-dialog";
 import { HostRegistrationForm } from "./host-registration-form";
 import { InviteLink } from "./invite-link";
 import { JoinPanel } from "./join-panel";
 import { ParticipantRoster } from "./participant-home";
 import { SettingsForm } from "./settings-form";
-import { AvailabilityBoard } from "./availability/availability-board";
+import { AvailabilityBoard, type Notice } from "./availability/availability-board";
+import { changeSummaryMessage } from "./change-summary";
 
 // 초대 링크 진입 페이지. 링크 상태(MEMBER-API-01)를 보고, promiseId가 생기면 /me로 본인 여부를 확인해
 // 화면을 고른다(API_CONVENTIONS 5.1 본인 복원 2단계). 설정은 참여자에게만 내려온다(STATE-API-01).
@@ -43,6 +45,9 @@ export function LinkEntry({ inviteToken }: { inviteToken: string }) {
   const [showInvite, setShowInvite] = useState(false);
   // 확정된 약속은 결과 화면(Figma 20)을 먼저 보여주고, "가능 시간 다시 보기"로 읽기 전용 시간표를 연다.
   const [showSchedule, setShowSchedule] = useState(false);
+  // 확정 결과 화면에서 방장이 연 재조율 팝업(연 버튼). 다시 열리면 시간표 화면에 결과 안내를 넘긴다.
+  const [reopenFrom, setReopenFrom] = useState<HTMLElement | null>(null);
+  const [boardNotice, setBoardNotice] = useState<Notice>(null);
 
   // 등록·로그인·로그아웃 뒤에는 화면에 쓰는 데이터를 모두 비우고 다시 받는다(이전 사람의 정보가 남지 않게).
   const { mutate } = useSWRConfig();
@@ -136,7 +141,33 @@ export function LinkEntry({ inviteToken }: { inviteToken: string }) {
           title={settings.title ?? ""}
           confirmation={confirmation}
           onShowSchedule={() => setShowSchedule(true)}
+          onReopen={viewer.role === "host" ? setReopenFrom : undefined}
         />
+        {reopenFrom && (
+          <ReopenDialog
+            promiseId={promiseId}
+            settings={{
+              title: settings.title ?? "",
+              dateRangeStart: settings.dateRange.startDate!,
+              dateRangeEnd: settings.dateRange.endDate!,
+              participantLimit: settings.participantLimit,
+              confirmed: true,
+            }}
+            onReopened={(summary) => {
+              setReopenFrom(null);
+              setBoardNotice({
+                tone: "info",
+                text: changeSummaryMessage("다시 모집을 시작했어요.", summary),
+              });
+              // 지금 데이터는 두고 다시 받는다(로그인 전환이 아니라 비울 필요가 없다).
+              void mutate(() => true);
+            }}
+            onClose={() => {
+              reopenFrom.focus();
+              setReopenFrom(null);
+            }}
+          />
+        )}
         <ParticipantRoster promiseId={promiseId} me={viewer} onLoggedOut={refresh} />
       </>
     );
@@ -152,6 +183,7 @@ export function LinkEntry({ inviteToken }: { inviteToken: string }) {
       onShowInvite={() => setShowInvite(true)}
       onLoggedOut={refresh}
       onSessionLost={refresh}
+      initialNotice={boardNotice}
       onConfirmed={() => {
         setShowSchedule(false);
         return refresh();

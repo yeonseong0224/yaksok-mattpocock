@@ -2,16 +2,17 @@ import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { rejectForeignOrigin } from "@/lib/api/origin";
 import { apiError, invalidRequest, noStore, readJsonObject } from "@/lib/api/responses";
-import { loadCandidates } from "@/lib/candidates/load-candidates";
 import {
-  afterDeadlineExpiresAt,
   authenticate,
-  extendActiveSessions,
   sessionCookieUntil,
   setSessionCookie,
   type SessionCookie,
 } from "@/lib/members/session";
-import { planSettingsChange } from "@/lib/promises/change-impact";
+import {
+  applySettingsChange,
+  settingsErrorBody,
+  type SettingsChangeSummary,
+} from "@/lib/promises/apply-settings-change";
 import {
   forbidden,
   invalidPromiseState,
@@ -29,20 +30,6 @@ import {
 import { parseSettingsPatchBody, type SettingsError } from "@/lib/promises/start-settings";
 import { toKstIso } from "@/lib/time";
 
-type ChangeImpactJson = {
-  rangeChanged: boolean;
-  hasAddedSelectableSlots: boolean;
-  submissionsReset: boolean;
-  removedSlotCount: number;
-  /** 입력이 지워진 인원 */
-  removedSlotParticipantCount: number;
-  versionChangedParticipantCount: number;
-  /** 이번 변경으로 제출 상태가 풀린 인원(이미 미제출이던 사람은 세지 않는다) */
-  submissionsResetParticipantCount: number;
-  /** 변경 후 후보가 하나라도 있는가 */
-  hasCandidates: boolean;
-};
-
 type Outcome =
   | { kind: "not_found" }
   | { kind: "cancelled" }
@@ -52,12 +39,12 @@ type Outcome =
   | {
       kind: "updated";
       promise: PromiseRow;
-      changeImpact: ChangeImpactJson;
+      changeImpact: SettingsChangeSummary;
       cookie: SessionCookie | null;
     };
 
 // STATE-API-03 모집 중 설정 변경(재설정). 방장만, 모집 중이고 마감 전일 때 이름·날짜 범위·정원·마감을 바꾼다.
-// 범위가 바뀌면 영향 계산(change-impact)대로 슬롯·버전·제출 상태를 한 트랜잭션에서 고친다.
+// 범위가 바뀌면 영향 계산대로 슬롯·버전·제출 상태를 한 트랜잭션에서 고친다(applySettingsChange).
 export async function PATCH(
   request: NextRequest,
   context: { params: Promise<{ promiseId: string }> },
@@ -92,25 +79,11 @@ export async function PATCH(
     }
     if (promise.status !== "collecting") return { kind: "wrong_state", status: promise.status };
 
-    const participants = await tx.participant.findMany({
-      where: { promiseId, status: "active" },
-      select: {
-        id: true,
-        availabilitySubmittedAt: true,
-        availableSlots: { select: { slotStartAt: true } },
-      },
-    });
-    const current = {
-      dateRangeStart: promise.dateRangeStart!,
-      dateRangeEnd: promise.dateRangeEnd!,
-      dailyStartMinute: promise.dailyStartMinute!,
-      dailyEndMinute: promise.dailyEndMinute!,
-      votingDeadlineAt: promise.votingDeadlineAt!,
-    };
     // 생략한 필드는 지금 값으로 채워 모집 시작과 같은 규칙으로 검증한다.
-    const impact = planSettingsChange({
-      current,
-      next: {
+    const applied = await applySettingsChange(
+      tx,
+      promise,
+      {
         title: patch.title ?? promise.title!,
         participantLimit: patch.participantLimit ?? promise.participantLimit!,
         dateRange: patch.dateRange ?? {
@@ -119,70 +92,16 @@ export async function PATCH(
         },
         votingDeadlineAt: patch.votingDeadlineAt ?? toKstIso(promise.votingDeadlineAt!),
       },
-      participants: participants.map((p) => ({
-        participantId: p.id,
-        slots: p.availableSlots.map((s) => s.slotStartAt.getTime()),
-      })),
-      now: promise.now,
-    });
-    if (!impact.ok) return { kind: "invalid", errors: impact.errors };
-    const { settings } = impact;
-
-    await tx.promise.update({
-      where: { id: promiseId },
-      data: {
-        title: settings.title,
-        participantLimit: settings.participantLimit,
-        dateRangeStart: new Date(`${settings.dateRangeStart}T00:00:00Z`),
-        dateRangeEnd: new Date(`${settings.dateRangeEnd}T00:00:00Z`),
-        votingDeadlineAt: settings.votingDeadlineAt,
-      },
-    });
-    for (const { participantId, slots } of impact.removedSlots) {
-      await tx.participantAvailableSlot.deleteMany({
-        where: { participantId, slotStartAt: { in: slots.map((ms) => new Date(ms)) } },
-      });
-    }
-    if (impact.versionBumped.length > 0) {
-      await tx.participant.updateMany({
-        where: { id: { in: impact.versionBumped } },
-        data: {
-          availabilityVersion: { increment: 1 },
-          // 고를 수 있는 시간이 늘면 전원의 제출 상태를 푼다(STATE-09-04). 남은 슬롯은 그대로 둔다(X-07).
-          ...(impact.rangeGrew ? { availabilitySubmittedAt: null } : {}),
-        },
-      });
-    }
-
-    // 마감이 바뀌면 유효한 세션을 새 마감 + 7일로 맞춘다(STATE-API-03 처리 순서 8).
-    let cookie: SessionCookie | null = null;
-    if (settings.votingDeadlineAt.getTime() !== promise.votingDeadlineAt!.getTime()) {
-      const sessionExpiresAt = afterDeadlineExpiresAt(settings.votingDeadlineAt);
-      await extendActiveSessions(tx, promiseId, promise.now, sessionExpiresAt);
-      cookie = sessionCookieUntil(viewer, promise.now, sessionExpiresAt);
-    }
-
-    const updated = (await findPromise(tx, promiseId))!;
-    const candidates = await loadCandidates(tx, updated);
-    const rangeChanged =
-      settings.dateRangeStart !== current.dateRangeStart ||
-      settings.dateRangeEnd !== current.dateRangeEnd;
+      { keptVotingDeadline: promise.votingDeadlineAt! },
+    );
+    if (!applied.ok) return { kind: "invalid", errors: applied.errors };
     return {
       kind: "updated",
-      promise: updated,
-      cookie,
-      changeImpact: {
-        rangeChanged,
-        hasAddedSelectableSlots: impact.rangeGrew,
-        submissionsReset: impact.rangeGrew,
-        removedSlotCount: impact.removedSlots.reduce((n, p) => n + p.slots.length, 0),
-        removedSlotParticipantCount: impact.removedSlots.length,
-        versionChangedParticipantCount: impact.versionBumped.length,
-        submissionsResetParticipantCount: impact.rangeGrew
-          ? participants.filter((p) => p.availabilitySubmittedAt !== null).length
-          : 0,
-        hasCandidates: candidates.length > 0,
-      },
+      promise: applied.promise,
+      changeImpact: applied.summary,
+      cookie: applied.sessionExpiresAt
+        ? sessionCookieUntil(viewer, promise.now, applied.sessionExpiresAt)
+        : null,
     };
   });
 
@@ -196,11 +115,8 @@ export async function PATCH(
     case "wrong_state":
       return invalidPromiseState(outcome.status, ["collecting"]);
     case "invalid": {
-      const [first] = outcome.errors;
-      return apiError(422, first.code ?? "VALIDATION_FAILED", first.message, {
-        field: first.field,
-        errors: outcome.errors,
-      });
+      const { code, message, details } = settingsErrorBody(outcome.errors);
+      return apiError(422, code, message, details);
     }
     case "updated": {
       const response = NextResponse.json({

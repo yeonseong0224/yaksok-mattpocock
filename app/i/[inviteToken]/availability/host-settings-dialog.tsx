@@ -7,6 +7,7 @@ import type { ChangeImpactInput } from "@/lib/promises/change-impact";
 import type { SettingsChangeSummary } from "../api";
 import { durationLabel } from "../calendar";
 import { useCloseOnEscape } from "../use-close-on-escape";
+import { changeSummaryMessage } from "../change-summary";
 import { EditSettingsForm } from "./edit-settings-form";
 
 // 방장 설정 보기(Figma 07 PromiseSidebar "방장 설정 보기", 방장에게만).
@@ -32,6 +33,7 @@ export function HostSettingsDialog({
   editable,
   participants,
   onSaved,
+  onReopen,
   onClose,
 }: {
   promiseId: string;
@@ -42,6 +44,8 @@ export function HostSettingsDialog({
   participants: ChangeImpactInput["participants"];
   /** 저장한 뒤 화면의 약속 정보를 다시 불러온다 */
   onSaved: () => void;
+  /** 마감·확정된 약속: 재설정 대신 재조율로 안내한다(스토리 8) */
+  onReopen: () => void;
   onClose: () => void;
 }) {
   const titleRef = useRef<HTMLHeadingElement>(null);
@@ -55,7 +59,7 @@ export function HostSettingsDialog({
   useEffect(() => titleRef.current?.focus(), [editing]);
 
   function saved(summary: SettingsChangeSummary) {
-    setSavedMessage(changeSummaryMessage(summary));
+    setSavedMessage(changeSummaryMessage("설정을 바꿨어요.", summary));
     setEditing(false);
     onSaved();
   }
@@ -133,7 +137,7 @@ export function HostSettingsDialog({
             <p className="mt-1 text-xs text-muted">
               {editable
                 ? "모집 중에는 약속 이름, 날짜, 정원, 마감을 바꿀 수 있어요."
-                : "지금 약속의 설정이에요. 모집이 끝나 바꿀 수 없어요."}
+                : "마감된 약속은 설정을 바꾸는 대신 새 마감을 정해 다시 조율할 수 있어요."}
             </p>
             {savedMessage && (
               <p
@@ -158,6 +162,7 @@ export function HostSettingsDialog({
               <Button variant="secondary" onClick={onClose}>
                 닫기
               </Button>
+              {!editable && <Button onClick={onReopen}>다시 조율하기</Button>}
               {editable && (
                 <Button
                   onClick={() => {
@@ -174,23 +179,4 @@ export function HostSettingsDialog({
       </div>
     </div>
   );
-}
-
-/** 저장 후 안내 문장(지워진 입력과 그 인원, 제출 상태가 풀린 인원, 후보 유무) */
-function changeSummaryMessage(summary: SettingsChangeSummary): string {
-  const parts = ["설정을 바꿨어요."];
-  if (summary.removedSlotCount > 0) {
-    parts.push(
-      `범위 밖 입력 ${summary.removedSlotCount}개(${summary.removedSlotParticipantCount}명)를 지웠어요.`,
-    );
-  }
-  if (summary.submissionsResetParticipantCount > 0) {
-    parts.push(
-      `고를 수 있는 날짜가 늘어 ${summary.submissionsResetParticipantCount}명의 제출 상태가 풀렸어요. 남은 선택은 그대로 집계돼요.`,
-    );
-  }
-  if (summary.rangeChanged) {
-    parts.push(summary.hasCandidates ? "지금 후보가 있어요." : "지금은 후보가 없어요.");
-  }
-  return parts.join(" ");
 }
