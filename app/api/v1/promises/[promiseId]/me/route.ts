@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { invalidRequest, noStore } from "@/lib/api/responses";
 import { authenticate, setSessionCookie } from "@/lib/members/session";
-import { promiseNotFound, unauthenticated } from "@/lib/promises/errors";
+import { promiseCancelled, promiseNotFound, unauthenticated } from "@/lib/promises/errors";
 import { effectiveStatus, findPromise, isUuid } from "@/lib/promises/promise-state";
 import { toKstIso } from "@/lib/time";
 
@@ -16,6 +16,8 @@ export async function GET(
   if (!isUuid(promiseId)) return invalidRequest();
   const promise = await findPromise(prisma, promiseId);
   if (!promise) return promiseNotFound();
+  // 취소된 약속은 인증보다 먼저 409다(C-10: 모든 약속 경로 API 통일, 약속 관리 티켓 05).
+  if (promise.status === "cancelled") return promiseCancelled();
   const viewer = await authenticate(prisma, request, promiseId);
   if (!viewer) return unauthenticated();
 

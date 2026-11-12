@@ -28,6 +28,7 @@ import { CandidateListPanel } from "./candidate-list";
 import { ConfirmDialog } from "./confirm-dialog";
 import { DateJumpDialog } from "./date-jump-dialog";
 import { HostSettingsDialog } from "./host-settings-dialog";
+import { CancelPromiseDialog } from "./cancel-promise-dialog";
 import { ReopenDialog } from "../reopen-dialog";
 import { changeSummaryMessage } from "../change-summary";
 import { MiniCalendar } from "./mini-calendar";
@@ -109,6 +110,8 @@ export function AvailabilityBoard({
   const [confirmClose, setConfirmClose] = useState(false);
   // 재조율(마감·확정 → 다시 모집 중) 팝업. 닫으면 포커스를 연 버튼으로 돌려준다.
   const [reopenFrom, setReopenFrom] = useState<HTMLElement | null>(null);
+  // 약속 취소 확인 팝업(연 버튼). 취소되면 링크 화면이 "취소된 약속"으로 바뀐다.
+  const [cancelFrom, setCancelFrom] = useState<HTMLElement | null>(null);
   const [closing, setClosing] = useState(false);
   const [confirming, setConfirming] = useState<ScheduledTime | null>(null);
   // 우클릭 반복 메뉴(Figma 09)와 반복 팝업(Figma 10·11)
@@ -306,6 +309,8 @@ export function AvailabilityBoard({
   const canConfirm = isHost && data.status === "closed";
   // 마감·확정 뒤 방장은 새 마감을 정해 다시 조율할 수 있다(STATE-09-01, RESULT-08-02).
   const canReopen = isHost && !editable;
+  // 후보 없음 안내의 약속 취소도 같은 때(방장·마감 뒤) 보인다. 방장 설정 팝업에서는 언제든 취소할 수 있다.
+  const canCancelFromCandidates = canReopen;
   const inspectedCandidate =
     inspecting === null
       ? undefined
@@ -552,6 +557,9 @@ export function AvailabilityBoard({
             }}
             onConfirm={canConfirm ? setConfirming : undefined}
             onReopen={canReopen ? (opener) => setReopenFrom(opener) : undefined}
+            onCancelPromise={
+              canCancelFromCandidates ? (opener) => setCancelFrom(opener) : undefined
+            }
           />
         )}
         {data.status === "confirmed" && (
@@ -668,9 +676,23 @@ export function AvailabilityBoard({
             setReopenFrom(settingsFrom);
             setSettingsFrom(null);
           }}
+          onCancelPromise={() => {
+            setCancelFrom(settingsFrom);
+            setSettingsFrom(null);
+          }}
           onClose={() => {
             focusOpener(settingsFrom);
             setSettingsFrom(null);
+          }}
+        />
+      )}
+      {cancelFrom && (
+        <CancelPromiseDialog
+          promiseId={promiseId}
+          onCancelled={() => void mutateAll(() => true)}
+          onClose={() => {
+            focusOpener(cancelFrom);
+            setCancelFrom(null);
           }}
         />
       )}

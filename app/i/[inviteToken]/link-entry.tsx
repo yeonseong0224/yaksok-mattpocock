@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import useSWR, { useSWRConfig } from "swr";
 import { buttonClass, Button, Card, CardText, CardTitle } from "@/app/_components/ui";
 import {
@@ -13,7 +13,9 @@ import {
   type LinkInfo,
   type Me,
   type PromiseView,
+  PROMISE_CANCELLED_EVENT,
 } from "./api";
+import { CreatePromiseButton } from "@/app/create-promise-button";
 import { ConfirmedView } from "./confirmed-view";
 import { ReopenDialog } from "./reopen-dialog";
 import { HostRegistrationForm } from "./host-registration-form";
@@ -24,10 +26,18 @@ import { SettingsForm } from "./settings-form";
 import { AvailabilityBoard, type Notice } from "./availability/availability-board";
 import { changeSummaryMessage } from "./change-summary";
 
+const LINK_POLL_MS = 5000;
+const OPEN_STATUSES: LinkInfo["promiseStatus"][] = ["collecting", "closed", "confirmed"];
+
 // 초대 링크 진입 페이지. 링크 상태(MEMBER-API-01)를 보고, promiseId가 생기면 /me로 본인 여부를 확인해
 // 화면을 고른다(API_CONVENTIONS 5.1 본인 복원 2단계). 설정은 참여자에게만 내려온다(STATE-API-01).
 export function LinkEntry({ inviteToken }: { inviteToken: string }) {
-  const link = useSWR<LinkInfo, ApiError>(linkUrl(inviteToken), getJson);
+  // 모집 시작 뒤에는 링크를 주기적으로 다시 읽는다. 폴링하지 않는 화면(확정 결과, 참여 폼)도
+  // 방장이 약속을 취소하면 다음 조회에서 "취소된 약속"으로 바뀐다(약속 관리 티켓 05).
+  const link = useSWR<LinkInfo, ApiError>(linkUrl(inviteToken), getJson, {
+    refreshInterval: (data) =>
+      data && OPEN_STATUSES.includes(data.promiseStatus) ? LINK_POLL_MS : 0,
+  });
   const promiseId = link.data?.promiseId ?? null;
   // 로그인하지 않았으면 /me는 401이다. 오류가 곧 "참여자가 아님"이므로 재시도하지 않는다.
   const me = useSWR<Me, ApiError>(promiseId ? meUrl(promiseId) : null, getJson, {
@@ -57,10 +67,20 @@ export function LinkEntry({ inviteToken }: { inviteToken: string }) {
   }, [mutate]);
   const expire = useCallback(() => setExpiredByClock(true), []);
 
+  // 어느 요청에서든 "취소된 약속" 응답을 받으면 링크를 다시 읽어 취소 화면으로 바꾼다(폴링 포함, 티켓 05).
+  const revalidateLink = link.mutate;
+  useEffect(() => {
+    const onCancelled = () => void revalidateLink();
+    window.addEventListener(PROMISE_CANCELLED_EVENT, onCancelled);
+    return () => window.removeEventListener(PROMISE_CANCELLED_EVENT, onCancelled);
+  }, [revalidateLink]);
+
   if (link.error) {
     if (link.error.status === 404 || link.error.status === 410) return <InvalidLink />;
     return <LoadFailed />;
   }
+  // 취소된 약속은 /me도 409라, 본인 확인 결과와 상관없이 먼저 취소 화면을 보여준다.
+  if (link.data?.promiseStatus === "cancelled") return <CancelledPromise />;
   if (meFailed) return <LoadFailed />;
   const meSettled = !promiseId || me.data !== undefined || me.error !== undefined;
   const promiseSettled = !viewer || promise.data !== undefined || promise.error !== undefined;
@@ -77,14 +97,6 @@ export function LinkEntry({ inviteToken }: { inviteToken: string }) {
         onHostTaken={refresh}
         onInvalidLink={refresh}
       />
-    );
-  }
-  if (status === "cancelled") {
-    return (
-      <Card>
-        <CardTitle>취소된 약속</CardTitle>
-        <CardText>방장이 약속을 취소했어요.</CardText>
-      </Card>
     );
   }
   if (!promiseId) return <LoadFailed />;
@@ -250,6 +262,20 @@ function DraftExpired({ onRestart }: { onRestart: () => void }) {
 }
 
 // Figma 22 「만료되거나 잘못된 링크」
+// Figma 22 "취소된 약속". 취소된 약속은 설정·입력·결과를 보여주지 않으므로(STATE-API-07)
+// Figma의 "응답과 시간 선택은 읽기 전용이에요" 문구는 쓰지 않는다.
+function CancelledPromise() {
+  return (
+    <Card>
+      <CardTitle>취소된 약속</CardTitle>
+      <CardText>취소된 약속입니다. 방장이 약속을 취소했어요.</CardText>
+      <div className="mt-6">
+        <CreatePromiseButton />
+      </div>
+    </Card>
+  );
+}
+
 function InvalidLink() {
   return (
     <Card>

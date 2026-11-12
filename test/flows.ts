@@ -224,3 +224,14 @@ export async function reopenPromise(client: TestClient, promiseId: string, body:
     body,
   });
 }
+
+// --- 취소(약속 관리 티켓 05) ---
+
+export async function cancelPromise(client: TestClient, promiseId: string) {
+  const { POST } = await import("@/app/api/v1/promises/[promiseId]/cancel/route");
+  return client.request(POST, {
+    method: "POST",
+    path: `/api/v1/promises/${promiseId}/cancel`,
+    params: { promiseId },
+  });
+}

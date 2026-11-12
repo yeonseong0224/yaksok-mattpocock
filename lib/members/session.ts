@@ -148,6 +148,21 @@ export async function extendActiveSessions(
   });
 }
 
+/**
+ * 약속의 모든 세션을 즉시 만료한다(약속 취소, STATE-API-07). 행은 지우지 않고 만료 시각만 지금으로 바꾼다.
+ * 참여자 상태(active·cancelled)와 상관없이 그 약속의 세션 전부다.
+ */
+export async function expireAllSessions(
+  tx: Prisma.TransactionClient,
+  promiseId: string,
+  now: Date,
+) {
+  await tx.participantSession.updateMany({
+    where: { expiresAt: { gt: now }, participant: { promiseId } },
+    data: { expiresAt: now },
+  });
+}
+
 /** 약속별 httpOnly 세션 쿠키(API_CONVENTIONS 5장). Path를 그 약속의 API 경로로 좁힌다. */
 export function setSessionCookie(response: NextResponse, cookie: SessionCookie) {
   response.cookies.set(cookieName(cookie.promiseId), cookie.token, {

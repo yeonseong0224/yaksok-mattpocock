@@ -34,6 +34,7 @@ export function HostSettingsDialog({
   participants,
   onSaved,
   onReopen,
+  onCancelPromise,
   onClose,
 }: {
   promiseId: string;
@@ -46,6 +47,8 @@ export function HostSettingsDialog({
   onSaved: () => void;
   /** 마감·확정된 약속: 재설정 대신 재조율로 안내한다(스토리 8) */
   onReopen: () => void;
+  /** 약속 취소 확인을 연다(STATE-API-07). 모집 중·마감·확정 모두 */
+  onCancelPromise: () => void;
   onClose: () => void;
 }) {
   const titleRef = useRef<HTMLHeadingElement>(null);
@@ -174,6 +177,14 @@ export function HostSettingsDialog({
                 </Button>
               )}
             </div>
+            {/* 되돌릴 수 없는 동작이라 다른 버튼과 떼어 둔다. 누르면 확인 팝업이 열린다. */}
+            <button
+              type="button"
+              onClick={onCancelPromise}
+              className="mt-4 w-full text-center text-sm text-danger underline-offset-2 hover:underline"
+            >
+              약속 취소
+            </button>
           </>
         )}
       </div>
