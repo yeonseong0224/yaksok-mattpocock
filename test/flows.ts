@@ -202,3 +202,15 @@ export async function confirmPromise(client: TestClient, promiseId: string, star
     body: { startAt },
   });
 }
+
+// --- 재설정(약속 관리 티켓 03) ---
+
+export async function updateSettings(client: TestClient, promiseId: string, body: unknown) {
+  const { PATCH } = await import("@/app/api/v1/promises/[promiseId]/settings/route");
+  return client.request(PATCH, {
+    method: "PATCH",
+    path: `/api/v1/promises/${promiseId}/settings`,
+    params: { promiseId },
+    body,
+  });
+}

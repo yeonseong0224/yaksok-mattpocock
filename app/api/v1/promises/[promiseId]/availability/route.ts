@@ -69,7 +69,8 @@ export async function GET(
       participantId: p.id,
       nickname: p.nickname,
       isHost: p.role === "host",
-      availableSlots: p.availabilitySubmittedAt ? slotsOf(p) : [],
+      // 슬롯은 제출해야만 저장된다. 범위 확대로 제출 상태가 풀려도 남은 선택은 보인다(X-07).
+      availableSlots: slotsOf(p),
     })),
     me: {
       participantId: me.id,

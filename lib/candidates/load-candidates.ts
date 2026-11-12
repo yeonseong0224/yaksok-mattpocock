@@ -4,7 +4,8 @@ import { MINUTE_MS, toKstIso } from "@/lib/time";
 import { attendeesFor, computeCandidates, type Respondent } from "./compute-candidates";
 
 // 후보 조회(티켓 08), 확정 재검증과 확정 결과(티켓 09)가 함께 쓰는 DB 읽기.
-// 제출을 마친 active 참여자만 계산에 넣는다(RESULT-01-01). 미제출·탈퇴자는 빠진다.
+// active 참여자의 저장된 슬롯을 계산에 넣는다. 슬롯은 제출해야만 저장되므로 한 번도 제출하지 않은 사람은
+// 슬롯이 없어 빠진다(RESULT-01-01). 범위 확대로 제출 상태가 풀린 사람의 남은 슬롯은 계속 들어간다(X-07). 탈퇴자는 빠진다.
 
 export type NamedParticipant = { participantId: string; nickname: string };
 
@@ -17,7 +18,7 @@ export type ScheduledTime = {
 
 async function loadRespondents(db: Db, promiseId: string) {
   const rows = await db.participant.findMany({
-    where: { promiseId, status: "active", availabilitySubmittedAt: { not: null } },
+    where: { promiseId, status: "active" },
     orderBy: [{ createdAt: "asc" }, { id: "asc" }],
     select: { id: true, nickname: true, availableSlots: { select: { slotStartAt: true } } },
   });

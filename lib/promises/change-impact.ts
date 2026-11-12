@@ -10,8 +10,8 @@ import {
 // 새 설정을 검증하고, 지울 슬롯·버전을 올릴 참여자·제출 상태를 풀지를 정한다. DB와 시계에 의존하지 않는다.
 
 export type ChangeImpactInput = {
-  /** 지금 설정의 범위 */
-  current: SlotRange;
+  /** 지금 설정의 범위와 마감 */
+  current: SlotRange & { votingDeadlineAt: Date };
   /** 바꿀 설정(모집 시작과 같은 모양) */
   next: StartSettingsInput;
   /** active 참여자와 그 슬롯(epoch 밀리초) */
@@ -36,6 +36,7 @@ export type ChangeImpact =
 export function planSettingsChange(input: ChangeImpactInput): ChangeImpact {
   const validated = validateStartSettings(input.next, input.now, {
     keptStartDate: input.current.dateRangeStart,
+    keptVotingDeadline: input.current.votingDeadlineAt,
   });
   const errors = validated.ok ? [] : [...validated.errors];
   // 정원은 현재 active 인원까지 줄일 수 있다(MEMBER-07-03). 범위(2~30) 오류가 이미 있으면 겹쳐 알리지 않는다.

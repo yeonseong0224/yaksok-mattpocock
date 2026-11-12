@@ -1,13 +1,16 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/app/_components/ui";
 import { hhmmToMinute, toKstIso } from "@/lib/time";
+import type { ChangeImpactInput } from "@/lib/promises/change-impact";
+import type { SettingsChangeSummary } from "../api";
 import { durationLabel } from "../calendar";
 import { useCloseOnEscape } from "../use-close-on-escape";
+import { EditSettingsForm } from "./edit-settings-form";
 
-// 방장 설정 보기(Figma 07 PromiseSidebar "방장 설정 보기", 2026-11-11 결정: 읽기 전용, 방장에게만).
-// 모집을 시작할 때 정한 설정을 보여주기만 한다. 설정 변경(재설정)은 다음 슬라이스다.
+// 방장 설정 보기(Figma 07 PromiseSidebar "방장 설정 보기", 방장에게만).
+// 지금 설정을 보여주고, 모집 중이면 "설정 바꾸기"로 재설정 폼을 연다(약속 관리 티켓 03).
 
 export type HostSettings = {
   title: string;
@@ -24,15 +27,38 @@ export type HostSettings = {
 const dotted = (date: string) => date.replaceAll("-", ".");
 
 export function HostSettingsDialog({
+  promiseId,
   settings,
+  editable,
+  participants,
+  onSaved,
   onClose,
 }: {
+  promiseId: string;
   settings: HostSettings;
+  /** 모집 중(마감 전)이면 설정을 바꿀 수 있다 */
+  editable: boolean;
+  /** active 참여자와 그 저장된 슬롯(epoch 밀리초) */
+  participants: ChangeImpactInput["participants"];
+  /** 저장한 뒤 화면의 약속 정보를 다시 불러온다 */
+  onSaved: () => void;
   onClose: () => void;
 }) {
   const titleRef = useRef<HTMLHeadingElement>(null);
-  useCloseOnEscape(onClose);
-  useEffect(() => titleRef.current?.focus(), []);
+  const [editing, setEditing] = useState(false);
+  const [savedMessage, setSavedMessage] = useState<string | null>(null);
+  // 바꾸는 중에는 Esc·바깥 클릭으로 닫지 않는다(고친 값이 사라지지 않게). 취소·✕로만 나간다.
+  const dismiss = () => {
+    if (!editing) onClose();
+  };
+  useCloseOnEscape(dismiss);
+  useEffect(() => titleRef.current?.focus(), [editing]);
+
+  function saved(summary: SettingsChangeSummary) {
+    setSavedMessage(changeSummaryMessage(summary));
+    setEditing(false);
+    onSaved();
+  }
 
   // 시작일과 종료일을 모두 포함한 일수
   const days =
@@ -70,10 +96,10 @@ export function HostSettingsDialog({
       aria-modal="true"
       aria-labelledby="host-settings-title"
       className="fixed inset-0 z-20 flex items-start justify-center overflow-y-auto bg-ink/30 px-4 py-6 sm:items-center"
-      onClick={onClose}
+      onClick={dismiss}
     >
       <div
-        className="w-full max-w-md rounded-2xl bg-surface p-6 shadow-xl"
+        className={`w-full rounded-2xl bg-surface p-6 shadow-xl ${editing ? "max-w-3xl" : "max-w-md"}`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start justify-between gap-4">
@@ -83,32 +109,88 @@ export function HostSettingsDialog({
             tabIndex={-1}
             className="text-lg font-bold outline-none"
           >
-            방장 설정
+            {editing ? "설정 바꾸기" : "방장 설정"}
           </h2>
           <button
             type="button"
             aria-label="닫기"
-            onClick={onClose}
+            onClick={editing ? () => setEditing(false) : onClose}
             className="flex h-9 w-9 items-center justify-center rounded-lg border border-line text-brand-ink hover:bg-canvas"
           >
             ✕
           </button>
         </div>
-        <p className="mt-1 text-xs text-muted">
-          모집을 시작할 때 정한 설정이에요. 읽기 전용이에요.
-        </p>
-        <dl className="mt-4 divide-y divide-line rounded-xl border border-line">
-          {rows.map(([label, value]) => (
-            <div key={label} className="flex items-start justify-between gap-4 px-4 py-3 text-sm">
-              <dt className="shrink-0 text-muted">{label}</dt>
-              <dd className="text-right font-medium break-words">{value}</dd>
+        {editing ? (
+          <EditSettingsForm
+            promiseId={promiseId}
+            settings={settings}
+            participants={participants}
+            onSaved={saved}
+            onCancel={() => setEditing(false)}
+          />
+        ) : (
+          <>
+            <p className="mt-1 text-xs text-muted">
+              {editable
+                ? "모집 중에는 약속 이름, 날짜, 정원, 마감을 바꿀 수 있어요."
+                : "지금 약속의 설정이에요. 모집이 끝나 바꿀 수 없어요."}
+            </p>
+            {savedMessage && (
+              <p
+                role="status"
+                className="mt-3 rounded-lg bg-brand/10 px-3 py-2 text-sm text-brand-ink"
+              >
+                {savedMessage}
+              </p>
+            )}
+            <dl className="mt-4 divide-y divide-line rounded-xl border border-line">
+              {rows.map(([label, value]) => (
+                <div
+                  key={label}
+                  className="flex items-start justify-between gap-4 px-4 py-3 text-sm"
+                >
+                  <dt className="shrink-0 text-muted">{label}</dt>
+                  <dd className="text-right font-medium break-words">{value}</dd>
+                </div>
+              ))}
+            </dl>
+            <div className="mt-4 flex gap-2">
+              <Button variant="secondary" onClick={onClose}>
+                닫기
+              </Button>
+              {editable && (
+                <Button
+                  onClick={() => {
+                    setSavedMessage(null);
+                    setEditing(true);
+                  }}
+                >
+                  설정 바꾸기
+                </Button>
+              )}
             </div>
-          ))}
-        </dl>
-        <Button variant="secondary" onClick={onClose} className="mt-4">
-          닫기
-        </Button>
+          </>
+        )}
       </div>
     </div>
   );
+}
+
+/** 저장 후 안내 문장(지워진 입력과 그 인원, 제출 상태가 풀린 인원, 후보 유무) */
+function changeSummaryMessage(summary: SettingsChangeSummary): string {
+  const parts = ["설정을 바꿨어요."];
+  if (summary.removedSlotCount > 0) {
+    parts.push(
+      `범위 밖 입력 ${summary.removedSlotCount}개(${summary.removedSlotParticipantCount}명)를 지웠어요.`,
+    );
+  }
+  if (summary.submissionsResetParticipantCount > 0) {
+    parts.push(
+      `고를 수 있는 날짜가 늘어 ${summary.submissionsResetParticipantCount}명의 제출 상태가 풀렸어요. 남은 선택은 그대로 집계돼요.`,
+    );
+  }
+  if (summary.rangeChanged) {
+    parts.push(summary.hasCandidates ? "지금 후보가 있어요." : "지금은 후보가 없어요.");
+  }
+  return parts.join(" ");
 }
