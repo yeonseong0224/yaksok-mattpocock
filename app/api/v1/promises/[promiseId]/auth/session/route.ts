@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { rejectForeignOrigin } from "@/lib/api/origin";
 import { apiError, invalidRequest, noStore, readJsonObject } from "@/lib/api/responses";
-import { participantCancelled } from "@/lib/members/errors";
+import { departedParticipantLogin } from "@/lib/members/errors";
 import { normalizeNickname } from "@/lib/members/nickname";
 import { verifyAgainstDummy, verifyPin } from "@/lib/members/pin";
 import { isValidPin } from "@/lib/members/pin-format";
@@ -60,7 +60,7 @@ export async function POST(
     : await verifyAgainstDummy(body.pin);
   if (!participant || !pinMatches) return invalidCredentials();
   if (participant.status !== "active") {
-    return participantCancelled();
+    return departedParticipantLogin();
   }
 
   // 기기마다 새 세션을 만든다. 다른 기기의 세션은 그대로 둔다(MEMBER-04-02).

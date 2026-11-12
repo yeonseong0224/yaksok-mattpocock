@@ -83,15 +83,15 @@ describe("로그인", () => {
     expect((await getMe(phone, promiseId)).status).toBe(200);
   });
 
-  it("탈퇴한 참여자는 403 PARTICIPANT_CANCELLED", async () => {
+  it("탈퇴한 참여자는 401 UNAUTHENTICATED(C-07)", async () => {
     const { promiseId } = await createCollectingPromise(createTestClient());
     await registerParticipant(createTestClient(), promiseId);
     await cancelParticipant(promiseId, "혜승");
 
     const res = await logIn(createTestClient(), promiseId);
 
-    expect(res.status).toBe(403);
-    expect(res.body).toMatchObject({ code: "PARTICIPANT_CANCELLED" });
+    expect(res.status).toBe(401);
+    expect(res.body).toMatchObject({ code: "UNAUTHENTICATED" });
   });
 
   it("다른 사이트의 Origin이면 403", async () => {

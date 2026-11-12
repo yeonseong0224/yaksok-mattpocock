@@ -235,3 +235,14 @@ export async function cancelPromise(client: TestClient, promiseId: string) {
     params: { promiseId },
   });
 }
+
+// --- 탈퇴와 승계(약속 관리 티켓 06) ---
+
+export async function leavePromise(client: TestClient, promiseId: string) {
+  const { DELETE } = await import("@/app/api/v1/promises/[promiseId]/participants/me/route");
+  return client.request(DELETE, {
+    method: "DELETE",
+    path: `/api/v1/promises/${promiseId}/participants/me`,
+    params: { promiseId },
+  });
+}

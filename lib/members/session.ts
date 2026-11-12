@@ -148,6 +148,18 @@ export async function extendActiveSessions(
   });
 }
 
+/** 한 참여자의 모든 세션을 즉시 만료한다(탈퇴, MEMBER-10-03). 행은 지우지 않는다. */
+export async function expireParticipantSessions(
+  tx: Prisma.TransactionClient,
+  participantId: string,
+  now: Date,
+) {
+  await tx.participantSession.updateMany({
+    where: { participantId, expiresAt: { gt: now } },
+    data: { expiresAt: now },
+  });
+}
+
 /**
  * 약속의 모든 세션을 즉시 만료한다(약속 취소, STATE-API-07). 행은 지우지 않고 만료 시각만 지금으로 바꾼다.
  * 참여자 상태(active·cancelled)와 상관없이 그 약속의 세션 전부다.
