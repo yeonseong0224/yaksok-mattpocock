@@ -10,8 +10,13 @@ import {
 // 새 설정을 검증하고, 지울 슬롯·버전을 올릴 참여자·제출 상태를 풀지를 정한다. DB와 시계에 의존하지 않는다.
 
 export type ChangeImpactInput = {
-  /** 지금 설정의 범위와 마감 */
-  current: SlotRange & { votingDeadlineAt: Date };
+  /** 지금 설정의 범위 */
+  current: SlotRange;
+  /**
+   * 재설정: 지금 마감. 바꾸지 않았으면 "지금 + 30분" 규칙을 다시 보지 않는다(생략한 값은 유지).
+   * 재조율은 새 마감을 반드시 다시 정하므로 넘기지 않는다.
+   */
+  keptVotingDeadline?: Date;
   /** 바꿀 설정(모집 시작과 같은 모양) */
   next: StartSettingsInput;
   /** active 참여자와 그 슬롯(epoch 밀리초) */
@@ -33,10 +38,25 @@ export type ChangeImpact =
     }
   | { ok: false; errors: SettingsError[] };
 
+/** 재설정·재조율 응답 changeImpact에 들어가는 요약(STATE-API-03·06). 화면도 같은 타입을 쓴다. */
+export type SettingsChangeSummary = {
+  rangeChanged: boolean;
+  hasAddedSelectableSlots: boolean;
+  submissionsReset: boolean;
+  removedSlotCount: number;
+  /** 범위 밖 입력이 지워진 인원 */
+  removedSlotParticipantCount: number;
+  versionChangedParticipantCount: number;
+  /** 이번 변경으로 제출 상태가 풀린 인원(이미 미제출이던 사람은 세지 않는다) */
+  submissionsResetParticipantCount: number;
+  /** 변경 후 후보가 하나라도 있는가 */
+  hasCandidates: boolean;
+};
+
 export function planSettingsChange(input: ChangeImpactInput): ChangeImpact {
   const validated = validateStartSettings(input.next, input.now, {
     keptStartDate: input.current.dateRangeStart,
-    keptVotingDeadline: input.current.votingDeadlineAt,
+    keptVotingDeadline: input.keptVotingDeadline,
   });
   const errors = validated.ok ? [] : [...validated.errors];
   // 정원은 현재 active 인원까지 줄일 수 있다(MEMBER-07-03). 범위(2~30) 오류가 이미 있으면 겹쳐 알리지 않는다.

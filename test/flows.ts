@@ -214,3 +214,13 @@ export async function updateSettings(client: TestClient, promiseId: string, body
     body,
   });
 }
+
+export async function reopenPromise(client: TestClient, promiseId: string, body: unknown) {
+  const { POST } = await import("@/app/api/v1/promises/[promiseId]/reopen/route");
+  return client.request(POST, {
+    method: "POST",
+    path: `/api/v1/promises/${promiseId}/reopen`,
+    params: { promiseId },
+    body,
+  });
+}

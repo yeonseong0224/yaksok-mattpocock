@@ -155,17 +155,8 @@ export async function patchJson<T>(url: string, body: unknown): Promise<T> {
 
 export const settingsUrl = (promiseId: string) => `${promiseUrl(promiseId)}/settings`;
 
-/** 재설정 응답의 영향 요약(STATE-API-03 changeImpact) */
-export type SettingsChangeSummary = {
-  rangeChanged: boolean;
-  hasAddedSelectableSlots: boolean;
-  submissionsReset: boolean;
-  removedSlotCount: number;
-  removedSlotParticipantCount: number;
-  versionChangedParticipantCount: number;
-  submissionsResetParticipantCount: number;
-  hasCandidates: boolean;
-};
+/** 재설정·재조율 응답의 영향 요약(STATE-API-03·06 changeImpact) */
+export type { SettingsChangeSummary } from "@/lib/promises/change-impact";
 
 export const availabilityUrl = (promiseId: string) => `${promiseUrl(promiseId)}/availability`;
 export const myAvailabilityUrl = (promiseId: string) => `${promiseUrl(promiseId)}/me/availability`;

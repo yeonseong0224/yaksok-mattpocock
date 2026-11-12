@@ -1,6 +1,7 @@
 "use client";
 
 import useSWR from "swr";
+import { Button } from "@/app/_components/ui";
 import { kstDate } from "@/lib/time";
 import {
   candidatesUrl,
@@ -18,6 +19,7 @@ export function CandidateListPanel({
   pollMs,
   onPick,
   onConfirm,
+  onReopen,
 }: {
   promiseId: string;
   pollMs: number;
@@ -25,6 +27,8 @@ export function CandidateListPanel({
   onPick: (date: string) => void;
   /** 방장·마감 후에만 넘긴다. 후보마다 확정 버튼이 생긴다. */
   onConfirm?: (candidate: ScheduledTime) => void;
+  /** 방장·마감 후에만 넘긴다. 후보가 없을 때 다시 조율하기를 바로 고를 수 있다(RESULT-08-02). */
+  onReopen?: (opener: HTMLElement) => void;
 }) {
   const result = useSWR<CandidateList, ApiError>(candidatesUrl(promiseId), getJson, {
     refreshInterval: pollMs,
@@ -51,7 +55,21 @@ export function CandidateListPanel({
       {!data && !result.error && <p className="mt-3 text-sm text-muted">불러오는 중…</p>}
       {data && data.candidates.length === 0 && (
         // RESULT-08-01
-        <p className="mt-3 text-sm text-muted">2명 이상 겹치는 시간이 없어요.</p>
+        <div className="mt-3 text-sm text-muted">
+          <p>2명 이상 겹치는 시간이 없어요.</p>
+          {onReopen && data.promiseStatus !== "collecting" && (
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <span>새 마감을 정해 다시 조율해 보세요.</span>
+              <Button
+                variant="secondary"
+                onClick={(e) => onReopen(e.currentTarget)}
+                className="sm:w-40"
+              >
+                다시 조율하기
+              </Button>
+            </div>
+          )}
+        </div>
       )}
       {data && data.candidates.length > 0 && (
         <ol className="mt-3 flex flex-col gap-2">

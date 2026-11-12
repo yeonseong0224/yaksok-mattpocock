@@ -28,6 +28,8 @@ import { CandidateListPanel } from "./candidate-list";
 import { ConfirmDialog } from "./confirm-dialog";
 import { DateJumpDialog } from "./date-jump-dialog";
 import { HostSettingsDialog } from "./host-settings-dialog";
+import { ReopenDialog } from "../reopen-dialog";
+import { changeSummaryMessage } from "../change-summary";
 import { MiniCalendar } from "./mini-calendar";
 import { toSortedKstIsos, useLocalDraft } from "./local-draft";
 import { RepeatDialog } from "./repeat-dialog";
@@ -46,7 +48,7 @@ const toMsSet = (slots: string[]) => new Set(slots.map((s) => Date.parse(s)));
 const sameSet = (a: Set<number>, b: Set<number>) =>
   a.size === b.size && [...a].every((x) => b.has(x));
 
-type Notice = { tone: "info" | "error"; text: string } | null;
+export type Notice = { tone: "info" | "error"; text: string } | null;
 /** 반복 메뉴·팝업의 원본 날짜. origin은 닫을 때 포커스를 돌려줄 요소다. */
 type RepeatOrigin = { date: string; origin: HTMLElement };
 /**
@@ -66,6 +68,7 @@ export function AvailabilityBoard({
   onLoggedOut,
   onSessionLost,
   onConfirmed,
+  initialNotice = null,
 }: {
   promiseId: string;
   title: string;
@@ -77,6 +80,8 @@ export function AvailabilityBoard({
   onSessionLost: () => void;
   /** 확정됐을 때(내가 했거나 폴링으로 알게 됐을 때) 결과 화면으로 넘어간다. */
   onConfirmed: () => void;
+  /** 다른 화면에서 넘어오며 보여줄 안내(확정 결과 화면에서 재조율한 뒤 등) */
+  initialNotice?: Notice;
 }) {
   const availability = useSWR<Availability, ApiError>(availabilityUrl(promiseId), getJson, {
     refreshInterval: POLL_MS,
@@ -97,11 +102,13 @@ export function AvailabilityBoard({
   const [settingsFrom, setSettingsFrom] = useState<HTMLElement | null>(null);
   const [confirmEmpty, setConfirmEmpty] = useState(false);
   const [pending, setPending] = useState(false);
-  const [notice, setNotice] = useState<Notice>(null);
+  const [notice, setNotice] = useState<Notice>(initialNotice);
   const [inspecting, setInspecting] = useState<number | null>(null);
   // 후보는 모집 중에도 실시간으로 보이고(RESULT-09-01, 스토리 59), 마감 즉시 최종 후보가 보인다(RESULT-09-02).
   const [candidatesOpen, setCandidatesOpen] = useState(true);
   const [confirmClose, setConfirmClose] = useState(false);
+  // 재조율(마감·확정 → 다시 모집 중) 팝업. 닫으면 포커스를 연 버튼으로 돌려준다.
+  const [reopenFrom, setReopenFrom] = useState<HTMLElement | null>(null);
   const [closing, setClosing] = useState(false);
   const [confirming, setConfirming] = useState<ScheduledTime | null>(null);
   // 우클릭 반복 메뉴(Figma 09)와 반복 팝업(Figma 10·11)
@@ -297,6 +304,8 @@ export function AvailabilityBoard({
   const isHost = me.role === "host";
   // 확정은 방장만, 마감 뒤에만, 표시 후보 중에서만 한다(STATE-07-01, RESULT-11-02).
   const canConfirm = isHost && data.status === "closed";
+  // 마감·확정 뒤 방장은 새 마감을 정해 다시 조율할 수 있다(STATE-09-01, RESULT-08-02).
+  const canReopen = isHost && !editable;
   const inspectedCandidate =
     inspecting === null
       ? undefined
@@ -506,6 +515,15 @@ export function AvailabilityBoard({
                 {closing ? "마감하는 중…" : confirmClose ? "마감하기" : "조기 마감"}
               </Button>
             )}
+            {canReopen && (
+              <Button
+                variant="secondary"
+                onClick={(e) => setReopenFrom(e.currentTarget)}
+                className="sm:w-36"
+              >
+                다시 조율하기
+              </Button>
+            )}
             {canConfirm && (
               <Button
                 onClick={() => {
@@ -533,6 +551,7 @@ export function AvailabilityBoard({
               setTab("heatmap");
             }}
             onConfirm={canConfirm ? setConfirming : undefined}
+            onReopen={canReopen ? (opener) => setReopenFrom(opener) : undefined}
           />
         )}
         {data.status === "confirmed" && (
@@ -644,13 +663,39 @@ export function AvailabilityBoard({
           }))}
           // 이름·정원은 약속 조회에서, 범위·마감은 가능 시간 조회에서 온다. 후보도 바뀌니 모두 다시 불러온다.
           onSaved={() => void mutateAll(() => true)}
-          onClose={() => {
-            // 모바일 서랍에서 열었으면 그 버튼은 사라졌으니 헤더 ☰로 돌려준다.
-            const target = settingsFrom.isConnected
-              ? settingsFrom
-              : document.querySelector<HTMLElement>(`#${HEADER_START_SLOT_ID} button`);
-            target?.focus();
+          onReopen={() => {
+            // 설정 팝업을 닫고, 재조율 팝업을 닫을 때는 "방장 설정 보기" 버튼으로 돌아간다.
+            setReopenFrom(settingsFrom);
             setSettingsFrom(null);
+          }}
+          onClose={() => {
+            focusOpener(settingsFrom);
+            setSettingsFrom(null);
+          }}
+        />
+      )}
+      {reopenFrom && (
+        <ReopenDialog
+          promiseId={promiseId}
+          settings={{
+            title,
+            dateRangeStart: settings.dateRangeStart,
+            dateRangeEnd: settings.dateRangeEnd,
+            participantLimit,
+            confirmed: data.status === "confirmed",
+          }}
+          onReopened={(summary) => {
+            focusOpener(reopenFrom);
+            setReopenFrom(null);
+            setNotice({
+              tone: "info",
+              text: changeSummaryMessage("다시 모집을 시작했어요.", summary),
+            });
+            void mutateAll(() => true);
+          }}
+          onClose={() => {
+            focusOpener(reopenFrom);
+            setReopenFrom(null);
           }}
         />
       )}
@@ -748,4 +793,12 @@ function weekLabel(weekStart: string): string {
       ? `${Number(end.slice(8, 10))}일`
       : `${Number(end.slice(5, 7))}월 ${Number(end.slice(8, 10))}일`;
   return `${y}년 ${m}월 · ${Number(weekStart.slice(8, 10))}–${endPart}`;
+}
+
+/** 팝업을 닫은 뒤 연 버튼으로 포커스를 돌려준다. 모바일 서랍에서 열었으면 그 버튼은 사라졌으니 헤더 ☰로. */
+function focusOpener(opener: HTMLElement) {
+  const target = opener.isConnected
+    ? opener
+    : document.querySelector<HTMLElement>(`#${HEADER_START_SLOT_ID} button`);
+  target?.focus();
 }

@@ -3,7 +3,7 @@
 import { useState, type FormEvent } from "react";
 import { Button } from "@/app/_components/ui";
 import { planSettingsChange, type ChangeImpactInput } from "@/lib/promises/change-impact";
-import { PARTICIPANT_LIMIT_MIN, type SettingsError } from "@/lib/promises/start-settings";
+import { PARTICIPANT_LIMIT_MIN } from "@/lib/promises/start-settings";
 import { hhmmToMinute } from "@/lib/time";
 import { ApiError, patchJson, settingsUrl, type SettingsChangeSummary } from "../api";
 import {
@@ -11,6 +11,9 @@ import {
   settingsBody,
   splitKst,
   toErrors,
+  errorsFromFailure,
+  rangeShrinks,
+  SHRINK_WARNING,
   type SettingsErrors,
   type SettingsValues,
 } from "../settings-fields";
@@ -18,9 +21,6 @@ import type { HostSettings } from "./host-settings-dialog";
 
 // 재설정(약속 관리 티켓 03, STATE-API-03): 모집 중에 이름·날짜 범위·정원·마감을 바꾼다.
 // 하루 시간 범위와 약속 길이는 바꾸지 않는다(MVP 고정). 범위를 줄이면 한 번 더 묻는다.
-
-/** 범위를 줄일 때의 일반 경고(STATE-API-03 범위 축소 확인) */
-const SHRINK_WARNING = "범위를 줄이면 제외되는 날짜·시간의 기존 입력이 삭제됩니다. 변경할까요?";
 
 export function EditSettingsForm({
   promiseId,
@@ -59,19 +59,15 @@ export function EditSettingsForm({
         dateRangeEnd: settings.dateRangeEnd,
         dailyStartMinute: hhmmToMinute(settings.dailyStartTime),
         dailyEndMinute: hhmmToMinute(settings.dailyEndTime),
-        votingDeadlineAt: new Date(settings.votingDeadlineAt),
       },
+      keptVotingDeadline: new Date(settings.votingDeadlineAt),
       next: body,
       participants,
       now: new Date(),
     });
     if (!plan.ok) return setErrors(toErrors(plan.errors));
     setErrors({});
-    // 기존 날짜가 하나라도 빠지면 경고한다(STATE-API-03 범위 축소 확인). 화면의 입력 목록은 늦을 수 있어 날짜로 판단한다.
-    const shrinks =
-      body.dateRange.startDate > settings.dateRangeStart ||
-      body.dateRange.endDate < settings.dateRangeEnd;
-    if (shrinks && !confirmShrink) return setConfirmShrink(true);
+    if (rangeShrinks(settings, body.dateRange) && !confirmShrink) return setConfirmShrink(true);
 
     setPending(true);
     try {
@@ -81,18 +77,13 @@ export function EditSettingsForm({
       );
       onSaved(result.changeImpact);
     } catch (error) {
-      if (error instanceof ApiError && error.status === 422) {
-        const list = (error.details?.errors as SettingsError[] | undefined) ?? [];
-        return setErrors(list.length > 0 ? toErrors(list) : { form: error.message });
-      }
-      setErrors({
-        form:
-          error instanceof ApiError && error.code === "INVALID_PROMISE_STATE"
-            ? "마감이 지나 설정을 바꿀 수 없어요. 마감 뒤에는 재조율로 다시 모집할 수 있어요."
-            : error instanceof ApiError
-              ? error.message
-              : "네트워크 오류로 저장하지 못했어요.",
-      });
+      setErrors(
+        error instanceof ApiError && error.code === "INVALID_PROMISE_STATE"
+          ? {
+              form: "마감이 지나 설정을 바꿀 수 없어요. 마감 뒤에는 다시 조율하기로 다시 모집할 수 있어요.",
+            }
+          : errorsFromFailure(error, "네트워크 오류로 저장하지 못했어요."),
+      );
     } finally {
       setPending(false);
     }

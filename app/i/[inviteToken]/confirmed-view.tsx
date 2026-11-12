@@ -11,10 +11,13 @@ export function ConfirmedView({
   title,
   confirmation,
   onShowSchedule,
+  onReopen,
 }: {
   title: string;
   confirmation: Confirmation;
   onShowSchedule: () => void;
+  /** 방장에게만 넘긴다. 확정을 풀고 다시 모집 중으로 돌린다(STATE-09-01) */
+  onReopen?: (opener: HTMLElement) => void;
 }) {
   const startMs = Date.parse(confirmation.startAt);
   const date = kstDate(new Date(startMs));
@@ -48,6 +51,11 @@ export function ConfirmedView({
       <Button variant="secondary" onClick={onShowSchedule} className="mt-6">
         가능 시간 다시 보기
       </Button>
+      {onReopen && (
+        <Button variant="secondary" onClick={(e) => onReopen(e.currentTarget)} className="mt-3">
+          다시 조율하기
+        </Button>
+      )}
       <p className="mt-3 text-xs text-muted">이 일정은 확정되었어요.</p>
     </Card>
   );
