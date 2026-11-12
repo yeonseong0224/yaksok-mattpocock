@@ -104,8 +104,17 @@ export async function deleteRequest(url: string): Promise<void> {
   if (!res.ok && res.status !== 401) throw await toApiError(res);
 }
 
+/** 실패하면(401 포함) ApiError를 던지는 DELETE. 로그아웃과 달리 401을 성공으로 보면 안 되는 요청에 쓴다. */
+export async function deleteJson<T>(url: string): Promise<T> {
+  const res = await fetch(url, { method: "DELETE" });
+  if (!res.ok) throw await toApiError(res);
+  return (await res.json()) as T;
+}
+
 export const meUrl = (promiseId: string) => `${promiseUrl(promiseId)}/me`;
 export const participantsUrl = (promiseId: string) => `${promiseUrl(promiseId)}/participants`;
+/** 본인 탈퇴·초안 없애기(STATE-API-08) */
+export const leaveUrl = (promiseId: string) => `${participantsUrl(promiseId)}/me`;
 export const sessionUrl = (promiseId: string) => `${promiseUrl(promiseId)}/auth/session`;
 
 /** 참여자가 시간표·후보를 볼 수 있는 약속 상태(마감 계산 반영) */

@@ -1,12 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import useSWR from "swr";
 import { Button } from "@/app/_components/ui";
 import { deleteRequest, getJson, participantsUrl, sessionUrl, type Me, type Roster } from "./api";
 import { clearLocalDraft } from "./availability/local-draft";
+import { LeaveDialog } from "./leave-dialog";
 
 // 참여자 명단(닉네임, 방장 표시)과 로그아웃(MEMBER-API-06·07). 제출 여부는 보여주지 않는다(MEMBER-08-02).
+// 맨 아래에 "이 약속에서 나가기"(STATE-API-08, 약속 관리 티켓 06)를 둔다.
 export function ParticipantRoster({
   promiseId,
   me,
@@ -22,6 +24,10 @@ export function ParticipantRoster({
   const roster = useSWR<Roster>(participantsUrl(promiseId), getJson);
   const [pending, setPending] = useState(false);
   const [failed, setFailed] = useState(false);
+  const leaveRef = useRef<HTMLButtonElement>(null);
+  const [leaving, setLeaving] = useState(false);
+  // 방장이 나가면 가장 먼저 들어온 다른 참여자가 방장이 된다(명단은 들어온 순서다). 최종 판정은 서버가 잠금 뒤 한다.
+  const successor = roster.data?.participants.find((p) => !p.isMe) ?? null;
 
   async function logOut() {
     setPending(true);
@@ -78,6 +84,32 @@ export function ParticipantRoster({
         <p role="alert" className="mt-2 text-right text-sm text-danger">
           로그아웃하지 못했어요. 다시 시도해 주세요.
         </p>
+      )}
+      <button
+        ref={leaveRef}
+        type="button"
+        onClick={() => setLeaving(true)}
+        // 방장에게는 승계 대상(또는 약속 취소)을 알려야 하니 명단을 받은 뒤에 연다.
+        disabled={!roster.data}
+        className="mt-3 disabled:text-muted w-full text-right text-sm text-danger underline-offset-2 hover:underline"
+      >
+        이 약속에서 나가기
+      </button>
+      {leaving && (
+        <LeaveDialog
+          promiseId={promiseId}
+          participantId={me.participantId}
+          leave={
+            me.role === "host"
+              ? { kind: "host", successorNickname: successor?.nickname ?? null }
+              : { kind: "member" }
+          }
+          onLeft={onLoggedOut}
+          onClose={() => {
+            setLeaving(false);
+            leaveRef.current?.focus();
+          }}
+        />
       )}
     </section>
   );

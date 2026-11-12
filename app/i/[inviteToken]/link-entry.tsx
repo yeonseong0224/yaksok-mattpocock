@@ -115,6 +115,7 @@ export function LinkEntry({ inviteToken }: { inviteToken: string }) {
           return refresh();
         }}
         onExpired={expire}
+        onDiscarded={refresh}
       />
     );
   }

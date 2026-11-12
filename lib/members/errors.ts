@@ -11,5 +11,6 @@ export const nicknameTaken = () =>
     },
   );
 export const promiseFull = () => apiError(409, "PROMISE_FULL", "참여 정원이 모두 찼습니다.");
-export const participantCancelled = () =>
-  apiError(403, "PARTICIPANT_CANCELLED", "참여가 종료된 계정입니다.");
+/** 탈퇴했거나 내보내진 참여자의 재로그인(2026-11-11 결정, C-07: 403 PARTICIPANT_CANCELLED를 바꿈) */
+export const departedParticipantLogin = () =>
+  apiError(401, "UNAUTHENTICATED", "이 약속에서 나갔거나 내보내졌어요.");

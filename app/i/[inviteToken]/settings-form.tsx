@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Button } from "@/app/_components/ui";
 import {
   defaultVotingDeadline,
@@ -8,6 +8,7 @@ import {
   type SettingsError,
 } from "@/lib/promises/start-settings";
 import { ApiError, postJson, promiseUrl } from "./api";
+import { LeaveDialog } from "./leave-dialog";
 import type { DateRange } from "./range-calendar";
 import {
   SettingsFields,
@@ -25,11 +26,14 @@ export function SettingsForm({
   draftExpiresAt,
   onStarted,
   onExpired,
+  onDiscarded,
 }: {
   promiseId: string;
   draftExpiresAt: string;
   onStarted: () => void;
   onExpired: () => void;
+  /** "이 약속 없애기"로 초안을 지웠다(STATE-API-08). 링크 첫 화면으로 돌아간다. */
+  onDiscarded: () => void;
 }) {
   const [title, setTitle] = useState("");
   const [range, setRange] = useState<DateRange>({ startDate: null, endDate: null });
@@ -38,6 +42,8 @@ export function SettingsForm({
   const [deadlineTouched, setDeadlineTouched] = useState(false);
   const [errors, setErrors] = useState<SettingsErrors>({});
   const [pending, setPending] = useState(false);
+  const discardRef = useRef<HTMLButtonElement>(null);
+  const [discarding, setDiscarding] = useState(false);
 
   // 방장이 마감을 직접 고치기 전까지는 종료일에 맞춰 기본값을 다시 계산한다(TIME-13-02).
   function changeRange(next: DateRange) {
@@ -98,6 +104,25 @@ export function SettingsForm({
           deadline={deadline}
         />
         <DraftCountdown draftExpiresAt={draftExpiresAt} onExpired={onExpired} />
+        <button
+          ref={discardRef}
+          type="button"
+          onClick={() => setDiscarding(true)}
+          className="self-start text-sm text-danger underline-offset-2 hover:underline"
+        >
+          이 약속 없애기
+        </button>
+        {discarding && (
+          <LeaveDialog
+            promiseId={promiseId}
+            leave={{ kind: "draft" }}
+            onLeft={onDiscarded}
+            onClose={() => {
+              setDiscarding(false);
+              discardRef.current?.focus();
+            }}
+          />
+        )}
       </aside>
 
       <form onSubmit={submit} noValidate className="flex flex-col gap-6">
