@@ -473,7 +473,7 @@ if (!response.ok) {
 - `participantLimit`: 2~30명이며 현재 active 인원 이상. 모집 중에도 현재 active 인원까지 감소 허용(2026-11-11 결정, MEMBER-07-03)
 - `dateRange`: 오늘(KST)부터, 양 끝 포함 최대 90일(TIME-04-01~03)
 - `votingDeadlineAt`: 연장·단축 모두 허용. 잠금 후 서버 시각 + 30분 이상, 날짜 범위 마지막 날 00:00(KST) 미만의 30분 경계(TIME-14-01/02, 2026-11-11 결정 TIME-14-03/04)
-- `dailyTimeRange`, `durationMinutes`: 받지 않는다. 하루 시간 범위(09:00~24:00)와 약속 길이(2시간)는 MVP 고정이다(2026-11-11 결정, STATE-03-01)
+- `dailyTimeRange`, `durationMinutes`: 받지 않는다. 하루 시간 범위(09:00~24:00)와 약속 길이(2시간)는 MVP 고정이다(2026-11-11 결정, STATE-03-01) 보내도 모집 시작(STATE-API-02)처럼 무시한다. 생략한 마감은 다시 검증하지 않는다(그대로 유지)
 
 ```json
 {
@@ -507,10 +507,17 @@ if (!response.ok) {
     "submissionsReset": false,
     "removedSlotCount": 12,
     "versionChangedParticipantCount": 3,
-    "candidateRecalculationRequired": true
+    "removedSlotParticipantCount": 2,
+    "submissionsResetParticipantCount": 0,
+    "hasCandidates": true
   }
 }
 ```
+
+- `removedSlotParticipantCount`: 범위 밖 입력이 지워진 인원
+- `submissionsResetParticipantCount`: 이번 변경으로 제출 상태가 풀린 인원(이미 미제출이던 사람은 세지 않음)
+- `hasCandidates`: 변경 후 후보가 하나라도 있는가. 범위 확대로 제출 상태가 풀린 사람의 남은 선택도 후보 계산에 들어간다(X-07)
+- (2026-11-12 구현, 약속 관리 티켓 03) `candidateRecalculationRequired`는 항상 true라 `hasCandidates`로 바꿨다
 
 ### 에러
 

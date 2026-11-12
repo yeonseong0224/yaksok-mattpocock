@@ -41,7 +41,7 @@ export type SettingsField = "title" | "participantLimit" | "dateRange" | "voting
 export type SettingsError = {
   field: SettingsField;
   message: string;
-  /** 따로 구분해 응답해야 하는 오류의 코드(그 밖에는 VALIDATION_ERROR) */
+  /** 따로 구분해 응답해야 하는 오류의 코드(그 밖에는 VALIDATION_FAILED) */
   code?: "CAPACITY_BELOW_ACTIVE_COUNT";
 };
 
@@ -65,6 +65,8 @@ export function validateStartSettings(
   options: {
     /** 재설정·재조율: 이미 지난 기존 시작일은 그대로 둘 수 있다(2026-11-11 결정). 새로 고르는 시작일은 오늘부터 */
     keptStartDate?: string;
+    /** 재설정·재조율: 바꾸지 않은 기존 마감은 "지금 + 30분" 규칙을 다시 보지 않는다(생략한 값은 유지) */
+    keptVotingDeadline?: Date;
   } = {},
 ): StartSettingsResult {
   const errors: SettingsError[] = [];
@@ -97,7 +99,9 @@ export function validateStartSettings(
   const deadline = parseDeadline(input.votingDeadlineAt);
   // 마지막 날 00:00과의 비교는 날짜 범위가 올바를 때만 한다(같은 원인으로 오류가 두 번 나지 않게).
   const lastDayMidnight = rangeError ? null : kstMidnight(endDate);
-  const deadlineError = votingDeadlineError(deadline, lastDayMidnight, now);
+  const deadlineKept =
+    deadline !== null && deadline.getTime() === options.keptVotingDeadline?.getTime();
+  const deadlineError = votingDeadlineError(deadline, lastDayMidnight, now, deadlineKept);
   if (deadlineError) errors.push({ field: "votingDeadlineAt", message: deadlineError });
 
   if (errors.length > 0) return { ok: false, errors };
@@ -171,10 +175,15 @@ function parseDeadline(value: string): Date | null {
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
-function votingDeadlineError(deadline: Date | null, lastDayMidnight: Date | null, now: Date) {
+function votingDeadlineError(
+  deadline: Date | null,
+  lastDayMidnight: Date | null,
+  now: Date,
+  kept = false,
+) {
   if (!deadline) return "마감 날짜와 시각을 다시 골라 주세요.";
   if (deadline.getTime() % SLOT_MS !== 0) return "마감 시각은 30분 단위로 골라 주세요.";
-  if (deadline < addMinutes(now, DEADLINE_MIN_LEAD_MINUTES)) {
+  if (!kept && deadline < addMinutes(now, DEADLINE_MIN_LEAD_MINUTES)) {
     return `마감은 지금부터 ${DEADLINE_MIN_LEAD_MINUTES}분 이상 뒤로 정해 주세요.`;
   }
   if (lastDayMidnight && deadline >= lastDayMidnight) {
@@ -192,4 +201,37 @@ export function defaultVotingDeadline(now: Date, endDate: string | null): Date {
   if (!endDate) return roundedUp;
   const latest = new Date(kstMidnight(endDate).getTime() - SLOT_MS);
   return roundedUp > latest ? latest : roundedUp;
+}
+
+/**
+ * 재설정 요청 본문(STATE-API-03): 바꿀 필드만 보낸다. 생략한 값은 지금 값을 유지한다.
+ * 바꿀 수 있는 필드가 하나 이상 있어야 한다. 하루 시간 범위·약속 길이는 모집 시작처럼 무시한다(MVP 고정).
+ * 형식이 어긋나면 null.
+ */
+export function parseSettingsPatchBody(
+  body: Record<string, unknown>,
+): Partial<StartSettingsInput> | null {
+  const fields = ["title", "participantLimit", "dateRange", "votingDeadlineAt"];
+  if (!fields.some((k) => k in body)) return null;
+  const patch: Partial<StartSettingsInput> = {};
+  const { title, participantLimit, dateRange, votingDeadlineAt } = body;
+  if ("title" in body) {
+    if (typeof title !== "string") return null;
+    patch.title = title;
+  }
+  if ("participantLimit" in body) {
+    if (typeof participantLimit !== "number") return null;
+    patch.participantLimit = participantLimit;
+  }
+  if ("votingDeadlineAt" in body) {
+    if (typeof votingDeadlineAt !== "string") return null;
+    patch.votingDeadlineAt = votingDeadlineAt;
+  }
+  if ("dateRange" in body) {
+    if (typeof dateRange !== "object" || dateRange === null) return null;
+    const { startDate, endDate } = dateRange as Record<string, unknown>;
+    if (typeof startDate !== "string" || typeof endDate !== "string") return null;
+    patch.dateRange = { startDate, endDate };
+  }
+  return patch;
 }

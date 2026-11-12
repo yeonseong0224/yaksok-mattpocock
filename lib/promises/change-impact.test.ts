@@ -15,6 +15,7 @@ const CURRENT = {
   dateRangeEnd: "2026-11-20",
   dailyStartMinute: 540,
   dailyEndMinute: 1440,
+  votingDeadlineAt: kst("2026-11-13T18:00:00"),
 };
 
 function input(
@@ -147,6 +148,16 @@ describe("설정 변경 영향", () => {
       expect(result.ok ? [] : result.errors.map((e) => e.field)).toEqual(
         ok ? [] : ["votingDeadlineAt"],
       );
+    });
+
+    it("바꾸지 않은 기존 마감은 30분 안으로 다가왔어도 다른 설정 변경을 막지 않는다", () => {
+      const nearDeadline = {
+        current: { ...CURRENT, votingDeadlineAt: kst("2026-11-12T15:00:00") },
+      };
+      const result = planSettingsChange(
+        input({ title: "새 이름", votingDeadlineAt: "2026-11-12T15:00:00+09:00" }, nearDeadline),
+      );
+      expect(result.ok).toBe(true);
     });
   });
 

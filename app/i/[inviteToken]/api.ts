@@ -143,6 +143,30 @@ export async function putJson<T>(url: string, body: unknown): Promise<T> {
   return (await res.json()) as T;
 }
 
+export async function patchJson<T>(url: string, body: unknown): Promise<T> {
+  const res = await fetch(url, {
+    method: "PATCH",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw await toApiError(res);
+  return (await res.json()) as T;
+}
+
+export const settingsUrl = (promiseId: string) => `${promiseUrl(promiseId)}/settings`;
+
+/** 재설정 응답의 영향 요약(STATE-API-03 changeImpact) */
+export type SettingsChangeSummary = {
+  rangeChanged: boolean;
+  hasAddedSelectableSlots: boolean;
+  submissionsReset: boolean;
+  removedSlotCount: number;
+  removedSlotParticipantCount: number;
+  versionChangedParticipantCount: number;
+  submissionsResetParticipantCount: number;
+  hasCandidates: boolean;
+};
+
 export const availabilityUrl = (promiseId: string) => `${promiseUrl(promiseId)}/availability`;
 export const myAvailabilityUrl = (promiseId: string) => `${promiseUrl(promiseId)}/me/availability`;
 

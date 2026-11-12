@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import useSWR from "swr";
+import useSWR, { useSWRConfig } from "swr";
 import { Button, HEADER_START_SLOT_ID } from "@/app/_components/ui";
 import { slotRanges } from "@/lib/availability/repeat";
 import type { SlotRange } from "@/lib/availability/slots";
@@ -82,6 +82,7 @@ export function AvailabilityBoard({
     refreshInterval: POLL_MS,
   });
   const data = availability.data;
+  const { mutate: mutateAll } = useSWRConfig();
 
   // 제출하지 않은 내 선택. null이면 고친 것이 없어 서버에 제출된 값을 그대로 보여준다.
   // 새로고침해도 남도록 이 브라우저에 저장된 값에서 시작하고, 바뀔 때마다 저장한다(TIME-10-01).
@@ -92,7 +93,7 @@ export function AvailabilityBoard({
   const [weekStart, setWeekStart] = useState<string | null>(null);
   // 날짜 이동 팝업이 처음 보여줄 달(YYYY-MM-01). null이면 닫혀 있다.
   const [jumpMonth, setJumpMonth] = useState<string | null>(null);
-  // 방장 설정 보기(읽기 전용). 닫으면 포커스를 연 버튼으로 돌려준다.
+  // 방장 설정 보기(모집 중이면 바꾸기). 닫으면 포커스를 연 버튼으로 돌려준다.
   const [settingsFrom, setSettingsFrom] = useState<HTMLElement | null>(null);
   const [confirmEmpty, setConfirmEmpty] = useState(false);
   const [pending, setPending] = useState(false);
@@ -634,7 +635,15 @@ export function AvailabilityBoard({
       )}
       {settingsFrom && (
         <HostSettingsDialog
+          promiseId={promiseId}
           settings={{ ...settings, title, participantLimit }}
+          editable={data.status === "collecting"}
+          participants={data.participants.map((p) => ({
+            participantId: p.participantId,
+            slots: p.availableSlots.map(Date.parse),
+          }))}
+          // 이름·정원은 약속 조회에서, 범위·마감은 가능 시간 조회에서 온다. 후보도 바뀌니 모두 다시 불러온다.
+          onSaved={() => void mutateAll(() => true)}
           onClose={() => {
             // 모바일 서랍에서 열었으면 그 버튼은 사라졌으니 헤더 ☰로 돌려준다.
             const target = settingsFrom.isConnected
