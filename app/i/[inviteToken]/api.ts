@@ -129,6 +129,8 @@ export type Availability = {
   status: OpenPromiseStatus;
   serverTime: string;
   settings: {
+    title: string;
+    participantLimit: number | null;
     dateRangeStart: string;
     dateRangeEnd: string;
     dailyStartTime: string;
