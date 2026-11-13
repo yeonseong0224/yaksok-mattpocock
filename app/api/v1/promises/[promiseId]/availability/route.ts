@@ -57,6 +57,9 @@ export async function GET(
     status: effectiveStatus(promise),
     serverTime: toKstIso(promise.now),
     settings: {
+      // 변경 알림 배너가 한 응답 안의 값끼리 비교하도록 이름·정원도 함께 준다(약속 관리 티켓 08).
+      title: promise.title,
+      participantLimit: promise.participantLimit,
       dateRangeStart: promise.dateRangeStart,
       dateRangeEnd: promise.dateRangeEnd,
       dailyStartTime: minuteToHhmm(promise.dailyStartMinute!),

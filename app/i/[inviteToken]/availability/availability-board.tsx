@@ -29,6 +29,8 @@ import { ConfirmDialog } from "./confirm-dialog";
 import { DateJumpDialog } from "./date-jump-dialog";
 import { HostSettingsDialog } from "./host-settings-dialog";
 import { CancelPromiseDialog } from "./cancel-promise-dialog";
+import { bannersFor, type Banner, type SeenState } from "./change-banners";
+import { loadSeen, saveSeen } from "./seen-state";
 import { ReopenDialog } from "../reopen-dialog";
 import { changeSummaryMessage } from "../change-summary";
 import { MiniCalendar } from "./mini-calendar";
@@ -90,6 +92,39 @@ export function AvailabilityBoard({
   const data = availability.data;
   const { mutate: mutateAll } = useSWRConfig();
   // 폴링 중 로그인이 끊기면(내보내짐 등) 바로 로그인 화면으로 보낸다. 이유 안내는 링크 화면이 한다(티켓 07).
+  // 변경 알림 배너(티켓 08): 지난번에 본 상태와 지금을 비교해 한 번만 띄운다. 비교한 뒤 지금 상태를 기억한다.
+  const [banners, setBanners] = useState<Banner[]>([]);
+  // 비교할 값은 모두 한 번의 가능 시간 조회에서 가져온다(따로 폴링하는 값이 섞이면 배너가 두 번 뜬다). 역할만 /me에서.
+  const seenKey = data
+    ? JSON.stringify({
+        status: data.status,
+        role: me.role,
+        title: data.settings.title,
+        dateRangeStart: data.settings.dateRangeStart,
+        dateRangeEnd: data.settings.dateRangeEnd,
+        participantLimit: data.settings.participantLimit,
+        votingDeadlineAt: data.settings.votingDeadlineAt,
+        slotCount: data.me.slots.length,
+        submitted: data.me.submitted,
+      } satisfies SeenState)
+    : null;
+  // 상태가 바뀐 렌더에서 바로 고른다(값이 바뀔 때 state를 맞추는 React 방식). 기억은 커밋 뒤에 남긴다.
+  const [comparedKey, setComparedKey] = useState<string | null>(null);
+  if (seenKey && seenKey !== comparedKey) {
+    setComparedKey(seenKey);
+    const fresh = bannersFor(
+      loadSeen(promiseId, me.participantId),
+      JSON.parse(seenKey) as SeenState,
+      Date.parse(data!.serverTime),
+    );
+    if (fresh.length > 0) {
+      setBanners((shown) => [...shown.filter((b) => !fresh.some((f) => f.id === b.id)), ...fresh]);
+    }
+  }
+  useEffect(() => {
+    if (seenKey) saveSeen(promiseId, me.participantId, JSON.parse(seenKey) as SeenState);
+  }, [seenKey, promiseId, me.participantId]);
+
   const sessionLost = availability.error?.status === 401;
   useEffect(() => {
     if (sessionLost) onSessionLost();
@@ -381,6 +416,27 @@ export function AvailabilityBoard({
       <section className="min-w-0">
         {/* 좁은 화면에서는 약속 정보가 서랍에 들어가므로, 화면 읽기용 제목을 따로 둔다. */}
         <h1 className="sr-only lg:hidden">{title}</h1>
+        {banners.length > 0 && (
+          <ul className="mb-4 flex flex-col gap-2" aria-label="바뀐 내용">
+            {banners.map((banner) => (
+              <li
+                key={banner.id}
+                role="status"
+                className="flex items-start justify-between gap-3 rounded-lg bg-brand/10 px-4 py-3 text-sm text-brand-ink"
+              >
+                <span>{banner.text}</span>
+                <button
+                  type="button"
+                  aria-label="알림 닫기"
+                  onClick={() => setBanners((shown) => shown.filter((b) => b.id !== banner.id))}
+                  className="shrink-0 px-1 text-brand-ink/70 hover:text-brand-ink"
+                >
+                  ✕
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
         <h2 className="text-xl font-bold">
           {tab === "mine" ? "가능한 시간을 골라 주세요" : "모두의 가능한 시간을 확인하세요"}
         </h2>

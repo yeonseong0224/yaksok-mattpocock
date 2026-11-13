@@ -356,6 +356,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ promiseI
 | -------------------------------------- | ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | status                                 | string                          | effectiveStatus. collecting / closed / confirmed. DB가 collecting이어도 현재 시각 ≥ 마감이면 closed                                                                                       |
 | serverTime **[제안]**                  | string (ISO-8601, 밀리초 3자리) | 조회 기준 서버 시각. 남은 시간 표시와 지난 슬롯 회색 처리에 기기 시계 대신 사용(TIME-15-03)                                                                                               |
+| settings.title / participantLimit      | string / integer                | 약속 이름·정원(2026-11-12 구현, 약속 관리 티켓 08: 변경 알림 배너가 한 응답으로 비교한다)                                                                                                 |
 | settings.dateRangeStart / dateRangeEnd | string (YYYY-MM-DD)             | 선택 가능 날짜 범위(양끝 포함, 한국 날짜)                                                                                                                                                 |
 | settings.dailyStartTime / dailyEndTime | string ("HH:mm")                | 하루 선택 가능 시각 경계. 종료는 "24:00" 가능                                                                                                                                             |
 | settings.durationMinutes               | integer                         | 약속 소요 시간(30의 배수)                                                                                                                                                                 |
@@ -378,6 +379,8 @@ participants[] 안의 내 항목은 다른 사람과 같은 규칙을 따른다.
   "status": "collecting",
   "serverTime": "2026-10-27T18:40:02.311+09:00",
   "settings": {
+    "title": "팀 저녁 모임",
+    "participantLimit": 6,
     "dateRangeStart": "2026-10-28",
     "dateRangeEnd": "2026-11-03",
     "dailyStartTime": "09:00",

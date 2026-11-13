@@ -41,8 +41,11 @@ export function LinkEntry({ inviteToken }: { inviteToken: string }) {
   });
   const promiseId = link.data?.promiseId ?? null;
   // 로그인하지 않았으면 /me는 401이다. 오류가 곧 "참여자가 아님"이므로 재시도하지 않는다.
+  // 로그인해 있는 동안 내 역할을 주기적으로 다시 읽는다(방장 승계를 알아채고 배너를 띄운다, 티켓 08).
   const me = useSWR<Me, ApiError>(promiseId ? meUrl(promiseId) : null, getJson, {
     shouldRetryOnError: false,
+    refreshInterval: (data) =>
+      data && OPEN_STATUSES.includes(data.promiseStatus) ? LINK_POLL_MS : 0,
   });
   const viewer = me.error ? null : (me.data ?? null);
   // 401은 "참여자가 아님"이다. 그 밖의 오류(서버·네트워크)는 로그인한 사람에게 참여 폼을 보이지 않게 따로 다룬다.
