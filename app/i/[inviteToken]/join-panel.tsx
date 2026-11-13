@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { buttonClass, Card, CardText, CardTitle } from "@/app/_components/ui";
 import { ApiError, participantsUrl, postJson, sessionUrl } from "./api";
 import { CredentialsForm, type CredentialErrors } from "./credentials-form";
@@ -13,6 +13,8 @@ export function JoinPanel({
   onJoined,
   onPromiseChanged,
   hostLogin = false,
+  notice,
+  onNoticeShown,
 }: {
   promiseId: string;
   /** 설정 중인 약속에 다른 기기의 방장이 로그인하는 경우 */
@@ -22,12 +24,30 @@ export function JoinPanel({
   onJoined: () => void;
   /** 등록 중에 마감되는 등 약속 상태가 바뀌었을 때 */
   onPromiseChanged: () => void;
+  /** 이 기기의 로그인이 끊긴 이유(내보내짐 등). 로그인 화면 위에 보여준다. */
+  notice?: string;
+  /** 안내를 한 번 보여줬다. 다음 방문에는 다시 보이지 않게 기억을 지운다. */
+  onNoticeShown?: () => void;
 }) {
-  const [mode, setMode] = useState<"register" | "login">(canRegister ? "register" : "login");
+  // 처음 받은 안내를 붙잡아 둔다(기억을 지워 부모가 안내를 거둬도 이 화면에서는 계속 보인다).
+  const [shownNotice] = useState(notice);
+  useEffect(() => {
+    if (shownNotice) onNoticeShown?.();
+  }, [shownNotice, onNoticeShown]);
+  // 내보내진 사람은 등록보다 로그인 화면이 먼저다(다른 닉네임으로는 새로 등록할 수 있다).
+  const [mode, setMode] = useState<"register" | "login">(
+    canRegister && !shownNotice ? "register" : "login",
+  );
+  const noticeBox = shownNotice && (
+    <p role="status" className="mb-4 rounded-lg bg-danger/10 px-4 py-3 text-sm text-danger">
+      {shownNotice}
+    </p>
+  );
 
   if (mode === "register" && canRegister) {
     return (
       <Card>
+        {noticeBox}
         <CardTitle>약속에 초대되었어요</CardTitle>
         <CardText>닉네임과 PIN을 정하면 바로 참여해요. 회원가입은 필요 없어요.</CardText>
         <CredentialsForm
@@ -85,6 +105,7 @@ export function JoinPanel({
 
   return (
     <Card>
+      {noticeBox}
       <CardTitle>
         {hostLogin ? "방장 로그인" : canRegister ? "다시 로그인하기" : "참여자만 볼 수 있어요"}
       </CardTitle>

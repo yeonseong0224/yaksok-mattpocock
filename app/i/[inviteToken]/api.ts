@@ -86,6 +86,8 @@ export type Me = {
   nickname: string;
   role: "host" | "member";
   promiseStatus: LinkInfo["promiseStatus"];
+  /** 이 기기 세션의 만료 시각(+09:00 ISO) */
+  sessionExpiresAt: string;
 };
 
 export type Roster = {
@@ -115,6 +117,9 @@ export const meUrl = (promiseId: string) => `${promiseUrl(promiseId)}/me`;
 export const participantsUrl = (promiseId: string) => `${promiseUrl(promiseId)}/participants`;
 /** 본인 탈퇴·초안 없애기(STATE-API-08) */
 export const leaveUrl = (promiseId: string) => `${participantsUrl(promiseId)}/me`;
+/** 방장의 내보내기(MEMBER-API-08) */
+export const participantUrl = (promiseId: string, participantId: string) =>
+  `${participantsUrl(promiseId)}/${participantId}`;
 export const sessionUrl = (promiseId: string) => `${promiseUrl(promiseId)}/auth/session`;
 
 /** 참여자가 시간표·후보를 볼 수 있는 약속 상태(마감 계산 반영) */
