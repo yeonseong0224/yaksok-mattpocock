@@ -1,6 +1,13 @@
 "use client";
 
-import { useEffect, useRef, useState, type MouseEvent, type PointerEvent } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type HTMLAttributes,
+  type MouseEvent,
+  type PointerEvent,
+} from "react";
 import { addDays, kstMidnight, MINUTE_MS } from "@/lib/time";
 import { WEEKDAYS, weekday } from "../calendar";
 
@@ -15,6 +22,12 @@ import { WEEKDAYS, weekday } from "../calendar";
 // 터치(Figma 23·24, vote-ui-extras 02):
 // - 선택 모드에서는 터치 드래그가 위와 같이 선택하고, 스크롤 모드에서는 화면이 움직인다(슬롯을 바꾸지 않는다).
 // - 날짜 열(머리글·슬롯)을 2초 동안 누르고 있으면 그 날짜의 반복 메뉴가 열린다. 데스크톱의 우클릭에 해당한다.
+//
+// 모바일 변형(variant="mobile", vote-ui-extras 03):
+// - 7일이 화면 폭에 다 들어가고, 시간은 격자 안에서 위아래로만 움직인다. 날짜 머리글은 위에 붙어 있다.
+// - 선택한 시간은 문구 없이 채움으로만 보인다. 날짜를 누르면 그날 시간을 직접 고치는 시트(onEditDay)가 열린다.
+//   오전·오후·저녁 블록 버튼은 없다(2026-11-16 결정).
+// - 선택 모드에서 드래그가 격자 위·아래 끝에 닿으면 격자가 그쪽으로 움직인다.
 
 export type SlotView =
   | { kind: "outside" } // 날짜 범위 밖
@@ -42,6 +55,14 @@ export type TouchMode = "select" | "scroll";
 /** 반복 메뉴를 연 방법. mouse는 우클릭·메뉴 키, touch는 길게 누르기 */
 export type RepeatTrigger = "mouse" | "touch";
 
+/** 모바일 격자 치수(px): 시각 열 폭, 날짜 머리글 높이, 30분 한 칸 높이 */
+const MOBILE_GUTTER_PX = 39;
+const MOBILE_HEADER_PX = 48;
+const MOBILE_ROW_PX = 22;
+/** 드래그가 격자 끝에서 이 거리 안에 들어오면, 움직일 때마다 이만큼 격자를 움직인다 */
+const EDGE_PX = 24;
+const EDGE_STEP_PX = 8;
+
 /** 길게 누르기로 반복 메뉴를 여는 시간 */
 const LONG_PRESS_MS = 2000;
 /** 이만큼 움직이면 길게 누르기가 아니라 드래그·스크롤로 본다 */
@@ -59,6 +80,8 @@ export function WeekGrid({
   onInspect,
   onRepeatMenu,
   touchMode,
+  variant = "desktop",
+  onEditDay,
 }: {
   /** 그 주 일요일(YYYY-MM-DD) */
   weekStart: string;
@@ -84,7 +107,11 @@ export function WeekGrid({
     trigger: RepeatTrigger,
   ) => void;
   touchMode: TouchMode;
+  variant?: "desktop" | "mobile";
+  /** 모바일에서 날짜 머리글을 누르면 그날 시간 수정 시트를 연다. 없으면 머리글은 누를 수 없다. */
+  onEditDay?: (date: string) => void;
 }) {
+  const scrollRef = useRef<HTMLDivElement>(null);
   const [drag, setDrag] = useState<Drag | null>(null);
   // 길게 누르기 진행 상태. 타이머가 울리기 전에 떼거나 움직이면 취소한다.
   const press = useRef<{ timer: number; x: number; y: number } | null>(null);
@@ -229,6 +256,15 @@ export function WeekGrid({
       cancelPress();
     }
     if (!drag) return;
+    // 모바일: 드래그가 격자 위·아래 끝에 닿으면 그쪽으로 움직인다(위쪽은 붙어 있는 머리글 아래가 기준).
+    const scroller = scrollRef.current;
+    if (scroller) {
+      const rect = scroller.getBoundingClientRect();
+      if (e.clientY > rect.bottom - EDGE_PX) scroller.scrollTop += EDGE_STEP_PX;
+      else if (e.clientY < rect.top + MOBILE_HEADER_PX + EDGE_PX) {
+        scroller.scrollTop -= EDGE_STEP_PX;
+      }
+    }
     // 포인터를 캡처하면 이벤트 대상이 격자로 고정되므로, 좌표로 아래에 있는 슬롯을 찾는다.
     const point = pointFrom(document.elementFromPoint(e.clientX, e.clientY));
     if (point && (point.day !== drag.current.day || point.row !== drag.current.row)) {
@@ -252,33 +288,157 @@ export function WeekGrid({
     onRepeatMenu(days[Number(column.dataset.day)], at, origin, "mouse");
   }
 
+  const gridProps: HTMLAttributes<HTMLDivElement> = {
+    role: "grid",
+    tabIndex: -1,
+    "aria-label": "주간 가능 시간표",
+    onPointerDown,
+    onPointerMove,
+    onPointerUp: () => {
+      cancelPress();
+      finishDrag();
+    },
+    onPointerCancel: () => {
+      cancelPress();
+      setDrag(null);
+    },
+    onClickCapture: (e) => {
+      // 길게 눌러 메뉴를 연 뒤 따라오는 click은 날짜·블록 선택으로 처리하지 않는다.
+      if (suppressClick.current) {
+        suppressClick.current = false;
+        e.stopPropagation();
+        e.preventDefault();
+      }
+    },
+    onContextMenu,
+  };
+  const selectClass = selectable ? "select-none [-webkit-touch-callout:none]" : "";
+
+  if (variant === "mobile") {
+    /** 드래그 미리보기를 반영한 칸의 모습 */
+    const shownAt = (point: Point): { view: SlotView; preview: boolean } => {
+      const view = viewAt(point);
+      return view.kind === "open" && drag && inDrag(point)
+        ? { view: { ...view, selected: drag.add }, preview: true }
+        : { view, preview: false };
+    };
+    const selectedAt = (day: number, row: number) =>
+      mode === "mine" && row >= 0 && row < minutes.length && isSelected(shownAt({ day, row }).view);
+    return (
+      <div
+        ref={scrollRef}
+        className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain border-x border-line bg-surface scrollbar-none"
+      >
+        <div
+          {...gridProps}
+          className={`grid pb-3 outline-none ${selectClass}`}
+          style={{ gridTemplateColumns: `${MOBILE_GUTTER_PX}px repeat(7, minmax(0, 1fr))` }}
+        >
+          <div
+            className="sticky top-0 z-10 flex items-center border-b border-line bg-surface pl-0.5 text-[9px] text-muted"
+            style={{ height: MOBILE_HEADER_PX }}
+          >
+            KST
+          </div>
+          {days.map((date, day) => {
+            const isToday = date === today;
+            const outside = viewAt({ day, row: 0 }).kind === "outside";
+            const dot = mode === "mine" && allRows.some((row) => isSelected(viewAt({ day, row })));
+            const content = (
+              <>
+                <span className={`text-[10px] ${isToday ? "text-brand" : "text-muted"}`}>
+                  {WEEKDAYS[weekday(date)]}
+                </span>
+                <b className="text-[13px] font-semibold">{Number(date.slice(8, 10))}</b>
+                {dot && <i className="absolute bottom-0.5 size-0.75 rounded-full bg-brand" />}
+              </>
+            );
+            const look = `relative flex h-full w-full flex-col items-center justify-center gap-0.5 rounded-[7px] ${
+              isToday ? "bg-brand/10 text-brand-ink" : ""
+            } ${outside ? "opacity-40" : ""}`;
+            return (
+              <div
+                key={date}
+                role="columnheader"
+                data-day={day}
+                className="sticky top-0 z-10 border-b border-line bg-surface p-0.5"
+                style={{ height: MOBILE_HEADER_PX }}
+              >
+                {onEditDay ? (
+                  <button
+                    type="button"
+                    disabled={outside}
+                    onClick={() => onEditDay(date)}
+                    aria-label={`${date} 시간 직접 수정${dot ? " · 고른 시간 있음" : ""}`}
+                    className={`${look} hover:bg-brand/10 disabled:cursor-not-allowed`}
+                  >
+                    {content}
+                  </button>
+                ) : (
+                  <div className={look}>{content}</div>
+                )}
+              </div>
+            );
+          })}
+          {/* 첫 시각 표시가 머리글에 가리지 않게 띄운다. */}
+          <div className="col-span-8 h-2" aria-hidden />
+
+          {minutes.map((minute, row) => (
+            <div key={minute} role="row" className="contents">
+              <div
+                className="relative text-[9px] text-muted"
+                style={{ height: MOBILE_ROW_PX }}
+                aria-hidden
+              >
+                {minute % 60 === 0 && (
+                  <span className="absolute -top-1.5 left-0.5 leading-3">{label(minute)}</span>
+                )}
+                {row === minutes.length - 1 && dailyEndMinute % 60 === 0 && (
+                  <span className="absolute -bottom-1.5 left-0.5 leading-3">
+                    {label(dailyEndMinute)}
+                  </span>
+                )}
+              </div>
+              {days.map((date, day) => {
+                const point = { day, row };
+                const real = viewAt(point);
+                const { view, preview } = shownAt(point);
+                return (
+                  <MobileSlotCell
+                    key={date}
+                    day={day}
+                    row={row}
+                    view={view}
+                    preview={preview}
+                    joinTop={selectedAt(day, row - 1)}
+                    joinBottom={selectedAt(day, row + 1)}
+                    mode={mode}
+                    total={total}
+                    label={`${date} ${label(minute)}`}
+                    topBorder={minute % 60 === 0}
+                    onInspect={onInspect ? () => onInspect(slotAt(point)) : undefined}
+                    touchSelect={selectable && touchMode === "select"}
+                    onKeyboardToggle={
+                      selectable && real.kind === "open"
+                        ? () => onSelect!([slotAt(point)], !real.selected)
+                        : undefined
+                    }
+                  />
+                );
+              })}
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="overflow-x-auto rounded-xl border border-line bg-surface">
       <div
-        role="grid"
-        tabIndex={-1}
-        aria-label="주간 가능 시간표"
-        className={`grid min-w-[640px] outline-none ${selectable ? "select-none [-webkit-touch-callout:none]" : ""}`}
+        {...gridProps}
+        className={`grid min-w-[640px] outline-none ${selectClass}`}
         style={{ gridTemplateColumns: "56px repeat(7, minmax(0, 1fr))" }}
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={() => {
-          cancelPress();
-          finishDrag();
-        }}
-        onPointerCancel={() => {
-          cancelPress();
-          setDrag(null);
-        }}
-        onClickCapture={(e) => {
-          // 길게 눌러 메뉴를 연 뒤 따라오는 click은 날짜·블록 선택으로 처리하지 않는다.
-          if (suppressClick.current) {
-            suppressClick.current = false;
-            e.stopPropagation();
-            e.preventDefault();
-          }
-        }}
-        onContextMenu={onContextMenu}
       >
         <div className="flex items-end border-b border-line px-2 pb-1 text-[11px] text-muted">
           KST
@@ -501,6 +661,115 @@ function SlotCell({
   );
 }
 
+/** 모바일 칸. 선택은 문구 없이 채움으로, 이어진 선택의 위·아래 끝만 둥글게 테두리를 그린다. */
+function MobileSlotCell({
+  day,
+  row,
+  view,
+  preview,
+  joinTop,
+  joinBottom,
+  mode,
+  total,
+  label: slotLabel,
+  topBorder,
+  onInspect,
+  onKeyboardToggle,
+  touchSelect,
+}: {
+  day: number;
+  row: number;
+  view: SlotView;
+  /** 드래그 중, 놓았을 때의 결과를 미리 보여주는 칸 */
+  preview: boolean;
+  /** 위·아래 칸도 선택돼 있어 이어지는가 */
+  joinTop: boolean;
+  joinBottom: boolean;
+  mode: "mine" | "heatmap";
+  total: number;
+  label: string;
+  topBorder: boolean;
+  onInspect?: () => void;
+  /** 키보드(Enter·Space)로 슬롯 하나를 바꾼다. 마우스·터치는 격자의 드래그가 처리한다. */
+  onKeyboardToggle?: () => void;
+  touchSelect: boolean;
+}) {
+  const border = `border-l border-line ${topBorder ? "border-t" : "border-t border-t-line/40"}`;
+  const position = { "data-day": day, "data-row": row };
+  const style = { height: MOBILE_ROW_PX };
+  if (view.kind === "outside") {
+    return (
+      <div
+        role="gridcell"
+        className={`bg-canvas ${border}`}
+        style={style}
+        aria-label={`${slotLabel} 범위 밖`}
+        {...position}
+      />
+    );
+  }
+
+  const past = view.kind === "past";
+  if (mode === "heatmap") {
+    const ratio = total > 0 ? view.count / total : 0;
+    return (
+      <button
+        type="button"
+        role="gridcell"
+        disabled={!onInspect}
+        onClick={onInspect}
+        className={`flex items-center justify-center text-[10px] ${border} ${past ? "opacity-50" : ""}`}
+        style={{
+          ...style,
+          backgroundColor: view.count > 0 ? `rgb(63 99 217 / ${0.12 + ratio * 0.78})` : undefined,
+          color: ratio > 0.5 ? "white" : "var(--color-brand-ink)",
+        }}
+        aria-label={`${slotLabel} ${view.count}/${total}명 가능`}
+        {...position}
+      >
+        {view.count > 0 && view.count}
+      </button>
+    );
+  }
+
+  const fill = !view.selected
+    ? preview
+      ? "inset-0.5 rounded-sm border border-dashed border-brand/50"
+      : null
+    : [
+        "inset-x-px border-x",
+        preview
+          ? "border-brand/60 bg-brand/40"
+          : past
+            ? "border-brand/30 bg-brand/10"
+            : "border-brand/50 bg-brand/20",
+        joinTop ? "-top-px" : "top-0 rounded-t-[5px] border-t",
+        joinBottom ? "-bottom-px" : "bottom-0 rounded-b-[5px] border-b",
+      ].join(" ");
+  return (
+    <button
+      type="button"
+      role="gridcell"
+      disabled={!onKeyboardToggle}
+      aria-selected={view.selected}
+      aria-label={`${slotLabel}${view.selected ? " 가능" : ""}${past ? " 지난 시간" : ""}`}
+      // 마우스 클릭은 드래그(한 슬롯짜리)로 처리되므로, 키보드로 누른 경우(detail 0)만 여기서 바꾼다.
+      onClick={(e) => e.detail === 0 && onKeyboardToggle?.()}
+      {...position}
+      style={style}
+      className={`relative ${onKeyboardToggle && touchSelect ? "touch-none" : ""} ${border} ${
+        past && !view.selected
+          ? "bg-[repeating-linear-gradient(135deg,transparent,transparent_4px,rgb(0_0_0/0.04)_4px,rgb(0_0_0/0.04)_8px)]"
+          : ""
+      } disabled:cursor-not-allowed`}
+    >
+      {fill && <span aria-hidden className={`pointer-events-none absolute ${fill}`} />}
+    </button>
+  );
+}
+
 function label(minute: number): string {
   return `${String(Math.floor(minute / 60)).padStart(2, "0")}:${String(minute % 60).padStart(2, "0")}`;
 }
+
+const isSelected = (view: SlotView) => view.kind !== "outside" && view.selected;

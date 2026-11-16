@@ -93,7 +93,7 @@ function DrawerPanel({ onClose, children }: { onClose: () => void; children: Rea
       onClick={onClose}
     >
       <div
-        className="flex h-full w-[312px] max-w-[85vw] flex-col gap-4 overflow-y-auto bg-surface px-4 pt-3 pb-6 shadow-xl"
+        className="flex h-full w-[312px] max-w-[85vw] flex-col gap-4 overflow-y-auto bg-surface px-4 pt-3 pb-6 shadow-xl *:shrink-0"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between">

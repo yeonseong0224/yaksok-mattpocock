@@ -43,7 +43,7 @@ export function CandidateListPanel({
       className="mt-4 rounded-xl border border-line bg-surface p-4"
       aria-labelledby="candidates-title"
     >
-      <div className="flex items-baseline justify-between">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-1">
         <h3 id="candidates-title" className="font-bold">
           {data?.promiseStatus === "collecting" ? "지금까지의 후보" : "최종 후보"}
         </h3>
