@@ -55,11 +55,11 @@ export function ConfirmDialog({
       role="dialog"
       aria-modal="true"
       aria-labelledby="confirm-title"
-      className="fixed inset-0 z-30 flex items-center justify-center bg-ink/30 px-4"
+      className="fixed inset-0 z-30 flex items-end justify-center bg-ink/30 sm:items-center sm:px-4"
       onClick={onClose}
     >
       <div
-        className="w-full max-w-md rounded-2xl bg-surface p-6 shadow-xl"
+        className="max-h-[calc(100dvh-4.5rem)] w-full overflow-y-auto rounded-t-[20px] bg-surface p-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] shadow-xl sm:max-h-none sm:max-w-md sm:rounded-2xl sm:pb-6"
         onClick={(e) => e.stopPropagation()}
       >
         <h2 id="confirm-title" className="text-lg font-bold">

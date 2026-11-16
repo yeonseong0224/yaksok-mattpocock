@@ -5,7 +5,7 @@ import useSWR, { useSWRConfig } from "swr";
 import { Button, HEADER_START_SLOT_ID } from "@/app/_components/ui";
 import { slotRanges } from "@/lib/availability/repeat";
 import type { SlotRange } from "@/lib/availability/slots";
-import { addDays, hhmmToMinute, kstDate, toKstIso } from "@/lib/time";
+import { addDays, hhmmToMinute, kstDate, kstMidnight, MINUTE_MS, toKstIso } from "@/lib/time";
 import {
   ApiError,
   availabilityUrl,
@@ -21,7 +21,7 @@ import {
   type Me,
   type SubmitResult,
 } from "../api";
-import { durationLabel, weekStartOf } from "../calendar";
+import { clockRangesLabel, dayLabel, durationLabel, weekStartOf } from "../calendar";
 import { ParticipantRoster } from "../participant-home";
 import { PromiseDrawer } from "../promise-drawer";
 import { CandidateListPanel } from "./candidate-list";
@@ -40,6 +40,10 @@ import { RepeatMenu, type RepeatMode } from "./repeat-menu";
 import { RepeatSheet, type RepeatSource } from "./repeat-sheet";
 import { TimeDetailDialog } from "./time-detail-dialog";
 import { WeekGrid, type RepeatTrigger, type SlotView, type TouchMode } from "./week-grid";
+import { applyDayRanges, dayMinuteRanges } from "@/lib/availability/day-edit";
+import { MOBILE_QUERY, useMediaQuery } from "../use-media-query";
+import { BottomSheet } from "./bottom-sheet";
+import { DayEditSheet } from "./day-edit-sheet";
 
 // 가능 시간 화면(Figma 07·13~17·21). 슬롯을 눌러 내 가능 시간을 고르고 제출한다.
 // 제출하기 전의 선택은 이 화면에만 있고, 다른 사람과 집계에는 제출한 값만 보인다(TIME-10-04).
@@ -159,6 +163,11 @@ export function AvailabilityBoard({
   const [repeating, setRepeating] = useState<(RepeatOrigin & { mode: RepeatMode }) | null>(null);
   // 모바일 터치 조작(Figma 23): 선택 모드는 드래그로 슬롯 선택, 스크롤 모드는 화면 이동
   const [touchMode, setTouchMode] = useState<TouchMode>("select");
+  // 모바일 시간표(sm 미만): 7일 한 화면, 날짜를 누르면 시간 수정 시트, 아래 고정 버튼(vote-ui-extras 03)
+  const mobile = useMediaQuery(MOBILE_QUERY);
+  // 시간 수정 시트를 연 날짜, 선택 내역 시트
+  const [editingDay, setEditingDay] = useState<string | null>(null);
+  const [summaryOpen, setSummaryOpen] = useState(false);
   // 후보 목록과 같은 키라 한 번만 조회된다. 확정 버튼을 보여줄 슬롯(표시 후보의 시작)을 알기 위해 쓴다.
   const candidates = useSWR<CandidateList, ApiError>(candidatesUrl(promiseId), getJson, {
     refreshInterval: POLL_MS,
@@ -251,6 +260,10 @@ export function AvailabilityBoard({
       if (add) next.add(slot);
       else next.delete(slot);
     }
+    replaceSelection(next);
+  }
+
+  function replaceSelection(next: Set<number>) {
     // 드래그가 끝날 때마다 바뀐 선택이 이 브라우저에 저장된다(TIME-10-01).
     setDraft({ slots: next, baseVersion: draft?.baseVersion ?? data!.me.version });
     setConfirmEmpty(false);
@@ -407,105 +420,247 @@ export function AvailabilityBoard({
     </>
   );
 
-  return (
-    <div className="grid gap-6 lg:grid-cols-[240px_1fr]">
-      {/* 약속 정보: 데스크톱은 왼쪽에, 좁은 화면은 헤더 ☰로 여는 서랍에(모바일 와이어프레임 PromiseSlide) */}
-      <aside className="hidden flex-col gap-4 lg:flex">{promiseInfo()}</aside>
-      <PromiseDrawer>{(close) => promiseInfo(close)}</PromiseDrawer>
-
-      <section className="min-w-0">
-        {/* 좁은 화면에서는 약속 정보가 서랍에 들어가므로, 화면 읽기용 제목을 따로 둔다. */}
-        <h1 className="sr-only lg:hidden">{title}</h1>
-        {banners.length > 0 && (
-          <ul className="mb-4 flex flex-col gap-2" aria-label="바뀐 내용">
-            {banners.map((banner) => (
-              <li
-                key={banner.id}
-                role="status"
-                className="flex items-start justify-between gap-3 rounded-lg bg-brand/10 px-4 py-3 text-sm text-brand-ink"
-              >
-                <span>{banner.text}</span>
-                <button
-                  type="button"
-                  aria-label="알림 닫기"
-                  onClick={() => setBanners((shown) => shown.filter((b) => b.id !== banner.id))}
-                  className="shrink-0 px-1 text-brand-ink/70 hover:text-brand-ink"
-                >
-                  ✕
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-        <h2 className="text-xl font-bold">
-          {tab === "mine" ? "가능한 시간을 골라 주세요" : "모두의 가능한 시간을 확인하세요"}
-        </h2>
-
-        <div className="mt-4 flex flex-wrap items-center gap-2">
-          <ToolButton onClick={() => setWeekStart(weekStartOf(firstVisible))}>오늘</ToolButton>
-          <ToolButton label="이전 주" onClick={() => setWeekStart(addDays(shownWeek, -7))}>
-            ‹
-          </ToolButton>
-          <ToolButton label="다음 주" onClick={() => setWeekStart(addDays(shownWeek, 7))}>
-            ›
-          </ToolButton>
+  const bannerList = banners.length > 0 && (
+    <ul className="mb-4 flex flex-col gap-2 max-sm:mb-2" aria-label="바뀐 내용">
+      {banners.map((banner) => (
+        <li
+          key={banner.id}
+          role="status"
+          className="flex items-start justify-between gap-3 rounded-lg bg-brand/10 px-4 py-3 text-sm text-brand-ink max-sm:px-3 max-sm:py-2 max-sm:text-xs"
+        >
+          <span>{banner.text}</span>
           <button
             type="button"
-            onClick={() => setJumpMonth(`${shownWeek.slice(0, 7)}-01`)}
-            className="h-10 rounded-lg border border-line bg-surface px-4 text-sm font-medium text-brand-ink hover:bg-canvas"
+            aria-label="알림 닫기"
+            onClick={() => setBanners((shown) => shown.filter((b) => b.id !== banner.id))}
+            className="shrink-0 px-1 text-brand-ink/70 hover:text-brand-ink"
           >
-            {weekLabel(shownWeek)}
+            ✕
           </button>
-          <div className="ml-auto flex rounded-lg bg-canvas p-1" role="tablist">
-            <Tab active={tab === "mine"} onClick={() => setTab("mine")}>
-              내 가능 시간
-            </Tab>
-            <Tab active={tab === "heatmap"} onClick={() => setTab("heatmap")}>
-              전체 현황
-            </Tab>
-          </div>
-        </div>
-        {editable && tab === "mine" && (
-          // 터치 기기에서만 보인다(화면 폭이 아니라 포인터 종류 기준이라 태블릿에도 보인다).
-          <div className="mt-3 hidden grid-cols-2 gap-1 rounded-lg bg-canvas p-1 pointer-coarse:grid">
-            <Tab active={touchMode === "select"} onClick={() => setTouchMode("select")} tall>
-              선택 모드
-            </Tab>
-            <Tab active={touchMode === "scroll"} onClick={() => setTouchMode("scroll")} tall>
-              스크롤 모드
-            </Tab>
+        </li>
+      ))}
+    </ul>
+  );
+
+  /** 모바일 시간표(vote-ui-extras 03). 7일 한 화면, 시간은 위아래로만, 버튼은 아래에 고정. */
+  function mobileLayout() {
+    const tag =
+      data!.status === "confirmed"
+        ? "약속 확정"
+        : data!.status === "closed"
+          ? "투표 마감"
+          : !dirty && data!.me.submitted
+            ? "제출 완료"
+            : null;
+    const selectedDays = new Set(futureSelected.map((ms) => kstDate(new Date(ms)))).size;
+    const topCandidate = candidates.data?.candidates[0];
+    const heatPrimary =
+      data!.status === "confirmed"
+        ? { text: "확정 결과 보기", onClick: onConfirmed }
+        : canConfirm
+          ? {
+              text: "약속 확정하기",
+              onClick: topCandidate ? () => setConfirming(topCandidate) : undefined,
+            }
+          : { text: editable ? "마감 후 확정할 수 있어요" : "방장 확정 대기" };
+
+    /** 서랍 아래쪽: 후보 목록과 방장의 조기 마감·다시 조율하기(2026-11-16 결정) */
+    const drawerExtras = (close: () => void) => (
+      <>
+        {editable && isHost && (
+          <div>
+            {confirmClose && (
+              <p className="mb-2 text-xs leading-5 text-danger">
+                {dirty
+                  ? "제출하지 않은 내 변경은 사라지고, 아무도 시간을 고칠 수 없어요. 마감할까요?"
+                  : "마감하면 아무도 시간을 고칠 수 없어요. 마감할까요?"}
+              </p>
+            )}
+            <Button variant="secondary" onClick={closeEarly} disabled={closing}>
+              {closing ? "마감하는 중…" : confirmClose ? "마감하기" : "조기 마감"}
+            </Button>
           </div>
         )}
-        <p className="mt-3 text-xs text-muted">
-          {tab === "mine" ? (
-            editable ? (
+        {canReopen && (
+          <Button
+            variant="secondary"
+            onClick={(e) => {
+              setReopenFrom(e.currentTarget);
+              close();
+            }}
+          >
+            다시 조율하기
+          </Button>
+        )}
+        <CandidateListPanel
+          promiseId={promiseId}
+          pollMs={POLL_MS}
+          onPick={(date) => {
+            setWeekStart(weekStartOf(date));
+            setTab("heatmap");
+            close();
+          }}
+          onConfirm={
+            canConfirm
+              ? (candidate) => {
+                  close();
+                  setConfirming(candidate);
+                }
+              : undefined
+          }
+          onReopen={
+            canReopen
+              ? (opener) => {
+                  setReopenFrom(opener);
+                  close();
+                }
+              : undefined
+          }
+          onCancelPromise={
+            canCancelFromCandidates
+              ? (opener) => {
+                  setCancelFrom(opener);
+                  close();
+                }
+              : undefined
+          }
+        />
+      </>
+    );
+
+    const navButton =
+      "flex h-11 items-center justify-center rounded-lg border border-line bg-surface text-brand-ink";
+    return (
+      <>
+        <PromiseDrawer>
+          {(close) => (
+            <>
+              {promiseInfo(close)}
+              {drawerExtras(close)}
+            </>
+          )}
+        </PromiseDrawer>
+        <h1 className="sr-only">{title}</h1>
+        <div className="px-4 pt-3">
+          {bannerList}
+          <h2 className="mb-2 flex items-center justify-between text-xl font-bold tracking-tight">
+            {tab === "mine" ? "가능한 시간을 선택해요" : "모두의 가능한 시간"}
+            {tag && (
+              <span className="rounded bg-line/70 px-1.5 py-1 text-[10px] font-medium text-muted">
+                {tag}
+              </span>
+            )}
+          </h2>
+          <div
+            role="tablist"
+            className="grid h-11 grid-cols-2 gap-0.75 rounded-[10px] bg-line/70 p-0.75"
+          >
+            {(["mine", "heatmap"] as const).map((t) => (
+              <button
+                key={t}
+                type="button"
+                role="tab"
+                aria-selected={tab === t}
+                onClick={() => setTab(t)}
+                className={`rounded-[7px] text-[13px] ${tab === t ? "bg-surface font-semibold text-brand-ink shadow-sm" : "text-muted"}`}
+              >
+                {t === "mine" ? "내 가능 시간" : "전체 현황"}
+              </button>
+            ))}
+          </div>
+          <div className="mt-2 flex gap-1.5">
+            <button
+              type="button"
+              onClick={() => setWeekStart(weekStartOf(firstVisible))}
+              className={`${navButton} w-11 shrink-0 text-xs`}
+            >
+              오늘
+            </button>
+            <button
+              type="button"
+              aria-label="이전 주"
+              onClick={() => setWeekStart(addDays(shownWeek, -7))}
+              className={`${navButton} w-11 shrink-0 text-lg`}
+            >
+              ‹
+            </button>
+            <button
+              type="button"
+              aria-label="다음 주"
+              onClick={() => setWeekStart(addDays(shownWeek, 7))}
+              className={`${navButton} w-11 shrink-0 text-lg`}
+            >
+              ›
+            </button>
+            <button
+              type="button"
+              onClick={() => setJumpMonth(`${shownWeek.slice(0, 7)}-01`)}
+              className={`${navButton} min-w-0 flex-1 gap-1 truncate px-2 text-[13px] font-semibold text-ink`}
+            >
+              {weekLabel(shownWeek)}
+              <span aria-hidden className="text-[10px] text-muted">
+                ▼
+              </span>
+            </button>
+          </div>
+          <div className="my-1 flex h-11 items-center justify-between gap-2">
+            {tab === "mine" ? (
               <>
-                <span className="hidden pointer-coarse:inline">
-                  {touchMode === "select"
-                    ? "선택 모드 · 드래그하면 시간을 고르거나 풀어요. 화면을 움직이려면 스크롤 모드로 바꾸세요."
-                    : "스크롤 모드 · 화면을 움직여요. 시간을 고르려면 선택 모드로 바꾸세요."}{" "}
-                  날짜나 시간을 2초 동안 누르고 있으면 반복할 수 있어요.
+                <span className="truncate text-[10px] text-muted">
+                  {!editable
+                    ? "마감되어 수정할 수 없어요"
+                    : touchMode === "select"
+                      ? "끌어서 선택 · 2초 누르면 반복"
+                      : "화면만 움직여요 · 2초 누르면 반복"}
                 </span>
-                <span className="pointer-coarse:hidden">
-                  30분 단위 · 빈 칸부터 드래그하면 추가, 선택한 칸부터 드래그하면 해제. 날짜나
-                  오전·오후·저녁을 누르면 한 번에 고르거나 풀어요. 빗금 칸은 지난 시간이에요.
-                </span>
+                {editable && (
+                  <div
+                    className="flex h-8.25 shrink-0 gap-0.75 rounded-[7px] border border-line bg-surface p-0.5"
+                    aria-label="시간표 조작 모드"
+                  >
+                    {(["select", "scroll"] as const).map((m) => (
+                      <button
+                        key={m}
+                        type="button"
+                        aria-pressed={touchMode === m}
+                        onClick={() => setTouchMode(m)}
+                        className={`rounded px-3 text-[11px] ${touchMode === m ? "bg-brand/10 font-semibold text-brand-ink" : ""}`}
+                      >
+                        {m === "select" ? "시간 선택" : "스크롤 모드"}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </>
             ) : (
-              "마감되어 수정할 수 없어요."
-            )
-          ) : (
-            "진할수록 더 많은 사람이 가능해요. 칸을 누르면 누가 가능한지 보여요."
-          )}
-        </p>
+              <>
+                <span className="truncate text-[10px] text-muted">
+                  칸을 누르면 참여자를 확인해요
+                </span>
+                <span className="flex shrink-0 items-center gap-1 text-[10px] text-muted">
+                  적음
+                  {[0.25, 0.5, 0.75, 1].map((r) => (
+                    <i
+                      key={r}
+                      className="h-3.25 w-3.75 rounded-xs border border-brand/20"
+                      style={{ backgroundColor: `rgb(63 99 217 / ${0.12 + r * 0.78})` }}
+                    />
+                  ))}
+                  많음
+                </span>
+              </>
+            )}
+          </div>
+        </div>
 
-        <div className="mt-3">
+        <div className="mx-4 flex min-h-0 flex-1 flex-col">
           <WeekGrid
+            variant="mobile"
             weekStart={shownWeek}
             dailyStartMinute={slotRange.dailyStartMinute}
             dailyEndMinute={slotRange.dailyEndMinute}
             mode={tab}
-            total={data.totalParticipants}
+            total={data!.totalParticipants}
             today={today}
             slotView={slotView}
             onSelect={editable && tab === "mine" ? applySelection : undefined}
@@ -515,136 +670,390 @@ export function AvailabilityBoard({
                 ? (date, at, origin, trigger) => setRepeatMenu({ date, origin, trigger, ...at })
                 : undefined
             }
+            onEditDay={editable && tab === "mine" ? setEditingDay : undefined}
             touchMode={touchMode}
           />
         </div>
 
-        {/* 모바일: 반복 사용·제출은 화면 아래에 늘 보인다(Figma 23 "하단 제출 버튼은 항상 접근 가능") */}
-        {editable && tab === "mine" && (
-          <div className="sticky bottom-0 z-10 -mx-4 mt-3 grid grid-cols-2 gap-2 border-t border-line bg-surface px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:hidden">
-            <Button
-              variant="secondary"
-              disabled={selected.size === 0}
-              onClick={(e) => setRepeatMenu({ trigger: "button", origin: e.currentTarget })}
+        <footer className="border-t border-line bg-surface px-4 pt-2.5 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+          {notice && (
+            <p
+              role={notice.tone === "error" ? "alert" : "status"}
+              className={`mb-2 text-xs leading-5 ${notice.tone === "error" ? "text-danger" : "text-brand-ink"}`}
             >
-              반복 사용
-            </Button>
-            <Button onClick={submit} disabled={pending}>
-              {submitLabel}
-            </Button>
+              {notice.text}
+            </p>
+          )}
+          {confirmEmpty && (
+            <p className="mb-2 text-xs text-danger">모두 불가능으로 제출됩니다. 계속할까요?</p>
+          )}
+          <div className="mb-2 flex min-h-5 items-center justify-between gap-2 text-[11px] text-muted">
+            <span className="truncate">
+              {tab === "heatmap" ? (
+                `참여자 ${data!.totalParticipants}명 · 최대 ${maxCount}명 가능`
+              ) : !editable ? (
+                "마감되어 수정할 수 없어요"
+              ) : (
+                <>
+                  {futureSelected.length === 0
+                    ? "아직 선택한 시간이 없어요"
+                    : `${selectedDays}일 · 총 ${durationLabel(futureSelected.length * 30)} 선택`}
+                  {dirty && <span className="text-brand-ink"> · 아직 제출 전</span>}
+                </>
+              )}
+            </span>
+            {tab === "mine" && (
+              <button
+                type="button"
+                onClick={() => setSummaryOpen(true)}
+                className="shrink-0 text-[11px] text-brand"
+              >
+                선택 내역
+              </button>
+            )}
           </div>
-        )}
-
-        <BottomBar>
-          <div className="text-sm text-muted">
-            {tab === "heatmap" ? (
-              `참여자 ${data.totalParticipants}명 · 한 칸에 최대 ${maxCount}명 가능`
+          <div className="flex gap-2">
+            {tab === "mine" ? (
+              <>
+                <div className="w-28 shrink-0">
+                  <Button
+                    variant="secondary"
+                    disabled={!editable || selected.size === 0}
+                    onClick={(e) => setRepeatMenu({ trigger: "button", origin: e.currentTarget })}
+                  >
+                    ↻ 반복
+                  </Button>
+                </div>
+                <div className="min-w-0 flex-1">
+                  <Button onClick={submit} disabled={!editable || pending}>
+                    {!pending && !confirmEmpty && data!.me.submitted
+                      ? "응답 수정 완료"
+                      : submitLabel}
+                  </Button>
+                </div>
+              </>
             ) : (
               <>
-                {futureSelected.length === 0
-                  ? "아직 선택한 시간이 없어요"
-                  : `${futureSelected.length}칸 · 총 ${durationLabel(futureSelected.length * 30)} 선택`}
-                {dirty && (
-                  <span className="ml-2 text-brand-ink">· 제출하지 않은 변경이 있어요</span>
-                )}
-                {!dirty && data.me.submitted && <span className="ml-2">· 제출 완료</span>}
+                <div className="w-28 shrink-0">
+                  <Button variant="secondary" onClick={() => setTab("mine")}>
+                    내 시간 보기
+                  </Button>
+                </div>
+                <div className="min-w-0 flex-1">
+                  <Button onClick={heatPrimary.onClick} disabled={!heatPrimary.onClick}>
+                    {heatPrimary.text}
+                  </Button>
+                </div>
               </>
             )}
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            {confirmEmpty && (
-              <span className="text-sm text-danger">모두 불가능으로 제출됩니다. 계속할까요?</span>
-            )}
-            {confirmClose && (
-              <span className="text-sm text-danger">
-                {dirty
-                  ? "제출하지 않은 내 변경은 사라지고, 아무도 시간을 고칠 수 없어요. 마감할까요?"
-                  : "마감하면 아무도 시간을 고칠 수 없어요. 마감할까요?"}
-              </span>
-            )}
-            <Button
-              variant="secondary"
-              onClick={() => setCandidatesOpen(!showCandidates)}
-              aria-expanded={showCandidates}
-              className="sm:w-32"
-            >
-              {showCandidates ? "후보 닫기" : "후보 보기"}
-            </Button>
-            {/* 모집 중에는 "일정 확정하기" 자리에 방장용 "조기 마감"(STATE-07-01, Figma와 다른 점) */}
-            {editable && isHost && (
-              <Button
-                variant="secondary"
-                onClick={closeEarly}
-                disabled={closing}
-                className="sm:w-32"
+        </footer>
+      </>
+    );
+  }
+
+  return (
+    <div
+      className={
+        mobile
+          ? "-mx-4 -my-10 flex h-[calc(100dvh-4rem)] flex-col bg-canvas"
+          : "grid gap-6 lg:grid-cols-[240px_1fr]"
+      }
+    >
+      {mobile ? (
+        mobileLayout()
+      ) : (
+        <>
+          {/* 약속 정보: 데스크톱은 왼쪽에, 좁은 화면은 헤더 ☰로 여는 서랍에(모바일 와이어프레임 PromiseSlide) */}
+          <aside className="hidden flex-col gap-4 lg:flex">{promiseInfo()}</aside>
+          <PromiseDrawer>{(close) => promiseInfo(close)}</PromiseDrawer>
+
+          <section className="min-w-0">
+            {/* 좁은 화면에서는 약속 정보가 서랍에 들어가므로, 화면 읽기용 제목을 따로 둔다. */}
+            <h1 className="sr-only lg:hidden">{title}</h1>
+            {bannerList}
+            <h2 className="text-xl font-bold">
+              {tab === "mine" ? "가능한 시간을 골라 주세요" : "모두의 가능한 시간을 확인하세요"}
+            </h2>
+
+            <div className="mt-4 flex flex-wrap items-center gap-2">
+              <ToolButton onClick={() => setWeekStart(weekStartOf(firstVisible))}>오늘</ToolButton>
+              <ToolButton label="이전 주" onClick={() => setWeekStart(addDays(shownWeek, -7))}>
+                ‹
+              </ToolButton>
+              <ToolButton label="다음 주" onClick={() => setWeekStart(addDays(shownWeek, 7))}>
+                ›
+              </ToolButton>
+              <button
+                type="button"
+                onClick={() => setJumpMonth(`${shownWeek.slice(0, 7)}-01`)}
+                className="h-10 rounded-lg border border-line bg-surface px-4 text-sm font-medium text-brand-ink hover:bg-canvas"
               >
-                {closing ? "마감하는 중…" : confirmClose ? "마감하기" : "조기 마감"}
-              </Button>
-            )}
-            {canReopen && (
-              <Button
-                variant="secondary"
-                onClick={(e) => setReopenFrom(e.currentTarget)}
-                className="sm:w-36"
-              >
-                다시 조율하기
-              </Button>
-            )}
-            {canConfirm && (
-              <Button
-                onClick={() => {
-                  setCandidatesOpen(true);
-                  setNotice({ tone: "info", text: "아래 후보 중 확정할 시간을 골라 주세요." });
-                }}
-                className="sm:w-40"
-              >
-                일정 확정하기
-              </Button>
-            )}
+                {weekLabel(shownWeek)}
+              </button>
+              <div className="ml-auto flex rounded-lg bg-canvas p-1" role="tablist">
+                <Tab active={tab === "mine"} onClick={() => setTab("mine")}>
+                  내 가능 시간
+                </Tab>
+                <Tab active={tab === "heatmap"} onClick={() => setTab("heatmap")}>
+                  전체 현황
+                </Tab>
+              </div>
+            </div>
             {editable && tab === "mine" && (
-              <Button onClick={submit} disabled={pending} className="hidden sm:flex sm:w-48">
-                {submitLabel}
-              </Button>
+              // 터치 기기에서만 보인다(화면 폭이 아니라 포인터 종류 기준이라 태블릿에도 보인다).
+              <div className="mt-3 hidden grid-cols-2 gap-1 rounded-lg bg-canvas p-1 pointer-coarse:grid">
+                <Tab active={touchMode === "select"} onClick={() => setTouchMode("select")} tall>
+                  선택 모드
+                </Tab>
+                <Tab active={touchMode === "scroll"} onClick={() => setTouchMode("scroll")} tall>
+                  스크롤 모드
+                </Tab>
+              </div>
             )}
-          </div>
-        </BottomBar>
-        {showCandidates && (
-          <CandidateListPanel
-            promiseId={promiseId}
-            pollMs={POLL_MS}
-            onPick={(date) => {
-              setWeekStart(weekStartOf(date));
-              setTab("heatmap");
-            }}
-            onConfirm={canConfirm ? setConfirming : undefined}
-            onReopen={canReopen ? (opener) => setReopenFrom(opener) : undefined}
-            onCancelPromise={
-              canCancelFromCandidates ? (opener) => setCancelFrom(opener) : undefined
-            }
-          />
-        )}
-        {data.status === "confirmed" && (
-          <div className="mt-3 flex items-center justify-between gap-3 rounded-lg bg-brand/10 px-4 py-3 text-sm text-brand-ink">
-            <span>약속이 확정됐어요.</span>
-            <button type="button" onClick={onConfirmed} className="font-medium underline">
-              확정 결과 보기
-            </button>
-          </div>
-        )}
-        {notice && (
-          <p
-            role={notice.tone === "error" ? "alert" : "status"}
-            className={`mt-3 text-sm ${notice.tone === "error" ? "text-danger" : "text-brand-ink"}`}
-          >
-            {notice.text}
-          </p>
-        )}
-        {!editable && (
-          <p className="mt-3 text-sm text-brand-ink">
-            마감되어 수정할 수 없어요. 방장의 최종 확정을 기다려 주세요.
-          </p>
-        )}
-      </section>
+            <p className="mt-3 text-xs text-muted">
+              {tab === "mine" ? (
+                editable ? (
+                  <>
+                    <span className="hidden pointer-coarse:inline">
+                      {touchMode === "select"
+                        ? "선택 모드 · 드래그하면 시간을 고르거나 풀어요. 화면을 움직이려면 스크롤 모드로 바꾸세요."
+                        : "스크롤 모드 · 화면을 움직여요. 시간을 고르려면 선택 모드로 바꾸세요."}{" "}
+                      날짜나 시간을 2초 동안 누르고 있으면 반복할 수 있어요.
+                    </span>
+                    <span className="pointer-coarse:hidden">
+                      30분 단위 · 빈 칸부터 드래그하면 추가, 선택한 칸부터 드래그하면 해제. 날짜나
+                      오전·오후·저녁을 누르면 한 번에 고르거나 풀어요. 빗금 칸은 지난 시간이에요.
+                    </span>
+                  </>
+                ) : (
+                  "마감되어 수정할 수 없어요."
+                )
+              ) : (
+                "진할수록 더 많은 사람이 가능해요. 칸을 누르면 누가 가능한지 보여요."
+              )}
+            </p>
+
+            <div className="mt-3">
+              <WeekGrid
+                weekStart={shownWeek}
+                dailyStartMinute={slotRange.dailyStartMinute}
+                dailyEndMinute={slotRange.dailyEndMinute}
+                mode={tab}
+                total={data.totalParticipants}
+                today={today}
+                slotView={slotView}
+                onSelect={editable && tab === "mine" ? applySelection : undefined}
+                onInspect={tab === "heatmap" ? setInspecting : undefined}
+                onRepeatMenu={
+                  editable && tab === "mine"
+                    ? (date, at, origin, trigger) => setRepeatMenu({ date, origin, trigger, ...at })
+                    : undefined
+                }
+                touchMode={touchMode}
+              />
+            </div>
+
+            {/* 모바일: 반복 사용·제출은 화면 아래에 늘 보인다(Figma 23 "하단 제출 버튼은 항상 접근 가능") */}
+            {editable && tab === "mine" && (
+              <div className="sticky bottom-0 z-10 -mx-4 mt-3 grid grid-cols-2 gap-2 border-t border-line bg-surface px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:hidden">
+                <Button
+                  variant="secondary"
+                  disabled={selected.size === 0}
+                  onClick={(e) => setRepeatMenu({ trigger: "button", origin: e.currentTarget })}
+                >
+                  반복 사용
+                </Button>
+                <Button onClick={submit} disabled={pending}>
+                  {submitLabel}
+                </Button>
+              </div>
+            )}
+
+            <BottomBar>
+              <div className="text-sm text-muted">
+                {tab === "heatmap" ? (
+                  `참여자 ${data.totalParticipants}명 · 한 칸에 최대 ${maxCount}명 가능`
+                ) : (
+                  <>
+                    {futureSelected.length === 0
+                      ? "아직 선택한 시간이 없어요"
+                      : `${futureSelected.length}칸 · 총 ${durationLabel(futureSelected.length * 30)} 선택`}
+                    {dirty && (
+                      <span className="ml-2 text-brand-ink">· 제출하지 않은 변경이 있어요</span>
+                    )}
+                    {!dirty && data.me.submitted && <span className="ml-2">· 제출 완료</span>}
+                  </>
+                )}
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                {confirmEmpty && (
+                  <span className="text-sm text-danger">
+                    모두 불가능으로 제출됩니다. 계속할까요?
+                  </span>
+                )}
+                {confirmClose && (
+                  <span className="text-sm text-danger">
+                    {dirty
+                      ? "제출하지 않은 내 변경은 사라지고, 아무도 시간을 고칠 수 없어요. 마감할까요?"
+                      : "마감하면 아무도 시간을 고칠 수 없어요. 마감할까요?"}
+                  </span>
+                )}
+                <Button
+                  variant="secondary"
+                  onClick={() => setCandidatesOpen(!showCandidates)}
+                  aria-expanded={showCandidates}
+                  className="sm:w-32"
+                >
+                  {showCandidates ? "후보 닫기" : "후보 보기"}
+                </Button>
+                {/* 모집 중에는 "일정 확정하기" 자리에 방장용 "조기 마감"(STATE-07-01, Figma와 다른 점) */}
+                {editable && isHost && (
+                  <Button
+                    variant="secondary"
+                    onClick={closeEarly}
+                    disabled={closing}
+                    className="sm:w-32"
+                  >
+                    {closing ? "마감하는 중…" : confirmClose ? "마감하기" : "조기 마감"}
+                  </Button>
+                )}
+                {canReopen && (
+                  <Button
+                    variant="secondary"
+                    onClick={(e) => setReopenFrom(e.currentTarget)}
+                    className="sm:w-36"
+                  >
+                    다시 조율하기
+                  </Button>
+                )}
+                {canConfirm && (
+                  <Button
+                    onClick={() => {
+                      setCandidatesOpen(true);
+                      setNotice({ tone: "info", text: "아래 후보 중 확정할 시간을 골라 주세요." });
+                    }}
+                    className="sm:w-40"
+                  >
+                    일정 확정하기
+                  </Button>
+                )}
+                {editable && tab === "mine" && (
+                  <Button onClick={submit} disabled={pending} className="hidden sm:flex sm:w-48">
+                    {submitLabel}
+                  </Button>
+                )}
+              </div>
+            </BottomBar>
+            {showCandidates && (
+              <CandidateListPanel
+                promiseId={promiseId}
+                pollMs={POLL_MS}
+                onPick={(date) => {
+                  setWeekStart(weekStartOf(date));
+                  setTab("heatmap");
+                }}
+                onConfirm={canConfirm ? setConfirming : undefined}
+                onReopen={canReopen ? (opener) => setReopenFrom(opener) : undefined}
+                onCancelPromise={
+                  canCancelFromCandidates ? (opener) => setCancelFrom(opener) : undefined
+                }
+              />
+            )}
+            {data.status === "confirmed" && (
+              <div className="mt-3 flex items-center justify-between gap-3 rounded-lg bg-brand/10 px-4 py-3 text-sm text-brand-ink">
+                <span>약속이 확정됐어요.</span>
+                <button type="button" onClick={onConfirmed} className="font-medium underline">
+                  확정 결과 보기
+                </button>
+              </div>
+            )}
+            {notice && (
+              <p
+                role={notice.tone === "error" ? "alert" : "status"}
+                className={`mt-3 text-sm ${notice.tone === "error" ? "text-danger" : "text-brand-ink"}`}
+              >
+                {notice.text}
+              </p>
+            )}
+            {!editable && (
+              <p className="mt-3 text-sm text-brand-ink">
+                마감되어 수정할 수 없어요. 방장의 최종 확정을 기다려 주세요.
+              </p>
+            )}
+          </section>
+        </>
+      )}
+
+      {editingDay && editable && (
+        <DayEditSheet
+          key={editingDay}
+          date={editingDay}
+          initialRanges={dayMinuteRanges(selected, editingDay)}
+          dailyStartMinute={slotRange.dailyStartMinute}
+          dailyEndMinute={slotRange.dailyEndMinute}
+          hasPast={
+            kstMidnight(editingDay).getTime() + slotRange.dailyStartMinute * MINUTE_MS <= serverNow
+          }
+          onApply={(ranges) => {
+            replaceSelection(
+              applyDayRanges({
+                selected,
+                date: editingDay,
+                ranges,
+                range: slotRange,
+                now: serverNow,
+              }),
+            );
+            setEditingDay(null);
+            setNotice({ tone: "info", text: "선택한 시간을 적용했어요 · 제출하면 저장돼요" });
+          }}
+          onClose={() => setEditingDay(null)}
+        />
+      )}
+      {summaryOpen && (
+        <BottomSheet
+          title="선택한 시간"
+          onClose={() => setSummaryOpen(false)}
+          actions={<Button onClick={() => setSummaryOpen(false)}>확인</Button>}
+        >
+          {repeatSources(selected).length === 0 ? (
+            <p className="rounded-lg border border-line bg-canvas p-3 text-xs text-muted">
+              선택한 시간이 없어요.
+            </p>
+          ) : (
+            <ul>
+              {repeatSources(selected).map(({ date, ranges }) => (
+                <li key={date} className="border-b border-line">
+                  <button
+                    type="button"
+                    disabled={!editable}
+                    onClick={() => {
+                      setSummaryOpen(false);
+                      setEditingDay(date);
+                    }}
+                    className="flex w-full gap-3.5 py-3 text-left text-xs disabled:cursor-default"
+                  >
+                    <b className="min-w-24 font-semibold">{dayLabel(date)}</b>
+                    <span className="leading-6 text-muted">
+                      {clockRangesLabel(ranges)
+                        .split(", ")
+                        .map((r) => (
+                          <span key={r} className="block">
+                            {r}
+                          </span>
+                        ))}
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          {editable && repeatSources(selected).length > 0 && (
+            <p className="mt-3 text-[11px] text-muted">날짜를 누르면 시간을 고칠 수 있어요.</p>
+          )}
+        </BottomSheet>
+      )}
 
       {inspecting !== null && (
         <TimeDetailDialog
