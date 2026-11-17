@@ -139,10 +139,10 @@ describe("재설정", () => {
     // 제출 상태가 풀려도 남은 선택은 다른 사람에게도 보이고 후보에도 들어간다.
     expect(board.participants.every((p) => p.availableSlots.length === 4)).toBe(true);
     const candidates = (await getCandidates(member, promiseId)).body as {
-      candidates: { availableParticipantCount: number }[];
+      blocks: { best: { availableParticipantCount: number } | null }[];
     };
-    expect(candidates.candidates).toEqual([
-      expect.objectContaining({ availableParticipantCount: 2 }),
+    expect(candidates.blocks).toEqual([
+      expect.objectContaining({ best: expect.objectContaining({ availableParticipantCount: 2 }) }),
     ]);
   });
 

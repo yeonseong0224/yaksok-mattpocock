@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@/prisma/generated/client";
 import { invalidRequest, noStore } from "@/lib/api/responses";
-import { scheduledTimeJson, loadCandidates } from "@/lib/candidates/load-candidates";
+import { candidateBlockJson, loadCandidateBlocks } from "@/lib/candidates/load-candidates";
 import { authenticate, setSessionCookie } from "@/lib/members/session";
 import {
   invalidPromiseState,
@@ -15,7 +15,8 @@ import { toKstIso } from "@/lib/time";
 
 // 후보 조회(STATE-API-10). 저장하지 않고 조회할 때마다 후보 계산 모듈로 계산한다.
 // 첫 슬라이스 결정(spec.md, RESULT-09-01·10-01): 모집 중에도 현재 제출값 기준의 후보를 보여주고,
-// 후보마다 참석 가능한 사람의 닉네임을 로그인한 참여자 모두에게 공개한다. 서로 겹치지 않는 최대 5개라 페이지는 없다.
+// 후보마다 참석 가능한 사람의 닉네임을 로그인한 참여자 모두에게 공개한다.
+// 후보는 하루 단위 블록(최대 5개)이고, 블록마다 최적 창을 함께 준다(candidate-blocks 02). 페이지는 없다.
 export async function GET(
   request: NextRequest,
   context: { params: Promise<{ promiseId: string }> },
@@ -37,18 +38,19 @@ export async function GET(
     async (tx) => {
       const promise = await findPromise(tx, promiseId);
       if (!promise) return null;
-      return { promise, candidates: await loadCandidates(tx, promise) };
+      return { promise, blocks: await loadCandidateBlocks(tx, promise) };
     },
     { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead },
   );
   if (!result) return promiseNotFound();
-  const { promise, candidates } = result;
+  const { promise, blocks } = result;
 
   const response = NextResponse.json({
     promiseId,
     promiseStatus: effectiveStatus(promise),
     calculatedAt: toKstIso(promise.now),
-    candidates: candidates.map(scheduledTimeJson),
+    durationMinutes: promise.durationMinutes,
+    blocks: blocks.map(candidateBlockJson),
   });
   setSessionCookie(response, viewer.cookie);
   return noStore(response);

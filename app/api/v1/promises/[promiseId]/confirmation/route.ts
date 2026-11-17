@@ -3,8 +3,10 @@ import { prisma } from "@/lib/prisma";
 import { rejectForeignOrigin } from "@/lib/api/origin";
 import { apiError, invalidRequest, noStore, readJsonObject } from "@/lib/api/responses";
 import {
+  candidateBlockJson,
+  loadPickedWindow,
   scheduledTimeJson,
-  loadCandidates,
+  type NamedBlock,
   type ScheduledTime,
 } from "@/lib/candidates/load-candidates";
 import { authenticate, setSessionCookie } from "@/lib/members/session";
@@ -26,7 +28,7 @@ type Outcome =
   | { kind: "not_host" }
   | { kind: "still_collecting" }
   | { kind: "wrong_state"; status: string }
-  | { kind: "not_a_candidate"; candidates: ScheduledTime[] }
+  | { kind: "not_a_candidate"; blocks: NamedBlock[] }
   | { kind: "confirmed"; confirmation: ScheduledTime };
 
 // STATE-API-05 확정. 방장만, 마감된 약속에서, 화면에 표시된 후보(서로 겹치지 않는 최대 5개) 중 하나만 확정한다.
@@ -73,10 +75,10 @@ export async function POST(
       return { kind: "wrong_state", status: promise.status };
     }
 
-    // 잠금 후 DB 시각으로 후보를 다시 계산한다. 같은 절대 시각이면 오프셋 표기가 달라도 같은 후보다.
-    const candidates = await loadCandidates(tx, promise);
-    const picked = candidates.find((c) => c.startAt.getTime() === startMs);
-    if (!picked) return { kind: "not_a_candidate", candidates };
+    // 잠금 후 DB 시각으로 후보 블록을 다시 계산하고, 그 안에서 고른 창이 확정할 수 있는지 본다
+    // (블록 안 30분 경계 시작, 약속 길이 내내 2명 이상, candidate-blocks 03). 오프셋 표기는 상관없다.
+    const { picked, blocks } = await loadPickedWindow(tx, promise, startMs);
+    if (!picked) return { kind: "not_a_candidate", blocks };
 
     // 시작 시각만 저장한다(RESULT-13-01). 제출 상태·슬롯은 그대로 둔다.
     await tx.promise.update({
@@ -110,7 +112,7 @@ export async function POST(
         409,
         "INVALID_CONFIRMATION_CANDIDATE",
         "후보가 바뀌었거나 더 이상 유효하지 않아요. 새 후보를 확인해 주세요.",
-        { candidates: outcome.candidates.map(scheduledTimeJson) },
+        { blocks: outcome.blocks.map(candidateBlockJson) },
       );
     case "confirmed": {
       const response = NextResponse.json({

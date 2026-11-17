@@ -1,10 +1,16 @@
 import { addDays, kstMidnight, MINUTE_MS, SLOT_MS } from "@/lib/time";
 
 // 후보 계산 모듈(스펙 「모듈 › 후보 계산 모듈」). DB와 시계에 의존하지 않는 순수 함수다.
-// 후보 조회(티켓 08)와 확정(티켓 09)이 같은 결과를 쓰도록 한 곳에 둔다.
+// 후보 조회와 확정이 같은 결과를 쓰도록 한 곳에 둔다.
+//
+// 하루 단위 후보(candidate-blocks 02, 2026-11-17 결정):
+// - 날짜마다 2명 이상 가능한 30분 칸이 이어진 구간 하나가 후보 블록이다.
+// - 블록마다 약속 길이만큼 연속으로 함께 가능한 사람이 가장 많은 창(같으면 빠른 창)이 최적 창이다.
+//   그런 창이 없으면(블록이 약속 길이보다 짧거나, 내내 함께 가능한 사람이 2명 미만) 선택할 수 없는 블록이다.
+// - 방장은 보여주는 블록 안에서 약속 길이 창의 시작을 골라 확정한다(pickWindow).
 
-/** 서로 겹치지 않게 골라 보여주는 후보 수(RESULT-07-01) */
-const MAX_CANDIDATES = 5;
+/** 보여주는 블록 수(RESULT-07-01) */
+const MAX_BLOCKS = 5;
 /** 후보가 되는 최소 가능 인원(RESULT-04-01) */
 const MIN_PARTICIPANTS = 2;
 
@@ -21,25 +27,34 @@ export type CandidateSettings = {
 /** 제출을 마친 active 참여자의 가능 슬롯. 미제출·탈퇴자는 호출하는 쪽이 빼고 넘긴다(RESULT-01-01). */
 export type Respondent = { participantId: string; slotStarts: Date[] };
 
+/** 약속 길이만큼의 창 하나 */
 export type Candidate = {
   startAt: Date;
   /** 시작 + 약속 길이. 구간은 [startAt, endAt) */
   endAt: Date;
-  /** 약속 길이 전체에 걸쳐 연속으로 가능한 참여자. 입력 순서를 따르지만, 쓰는 쪽은 순서에 기대지 않는다. */
+  /** 약속 길이 전체에 걸쳐 연속으로 가능한 참여자(입력 순서) */
   participantIds: string[];
 };
 
+export type CandidateBlock = {
+  /** 한국 날짜 YYYY-MM-DD */
+  date: string;
+  /** 2명 이상 가능한 칸이 이어진 구간 [startAt, endAt) */
+  startAt: Date;
+  endAt: Date;
+  /** 최적 창. null이면 이 블록에서는 확정할 수 없다. */
+  best: Candidate | null;
+};
+
 /**
- * 서로 겹치지 않는 최대 5개 후보를 순위대로 돌려준다. 후보가 없으면 빈 배열.
+ * 보여줄 후보 블록(최대 5개). 선택할 수 있는 블록이 먼저(최적 인원 많은 순, 같으면 빠른 순),
+ * 선택할 수 없는 블록은 그 뒤에 빠른 순이다.
  *
- * - 시작 시각은 30분 슬롯 경계이고, 구간 전체가 하루 시간 범위 안에 있어야 한다.
- *   자정을 넘는 후보는 하루 시간 범위가 00:00~24:00이라 날짜끼리 이어질 때만 생긴다(TIME-05-02).
- * - 약속 길이의 모든 슬롯이 가능한 참여자만 센다(RESULT-03-01). 2명 미만이면 후보가 아니다.
- * - 기준 시각(now)보다 이전에 시작하는 후보는 뺀다(TIME-08-02).
- * - 가능 인원 많은 순, 같으면 시작이 빠른 순으로 정렬한 뒤, 앞에서부터 고르며
- *   이미 고른 후보와 겹치면 건너뛴다(RESULT-06-01·02, RESULT-07-02).
+ * - 칸은 하루 시간 범위·날짜 범위 안이고, 기준 시각(now) 이후에 시작해야 한다(TIME-08-02).
+ * - 블록은 날짜를 넘지 않는다(하루 단위).
+ * - 창의 인원은 약속 길이 전체에 연속으로 가능한 사람만 센다(RESULT-03-01).
  */
-export function computeCandidates({
+export function computeCandidateBlocks({
   settings,
   respondents,
   now,
@@ -47,79 +62,76 @@ export function computeCandidates({
   settings: CandidateSettings;
   respondents: Respondent[];
   now: Date;
-}): Candidate[] {
+}): CandidateBlock[] {
+  const sets = toSets(respondents);
   const durationMs = settings.durationMinutes * MINUTE_MS;
-  const availability = respondents.map((r) => ({
-    participantId: r.participantId,
-    slots: new Set(r.slotStarts.map((d) => d.getTime())),
-  }));
+  const blocks: CandidateBlock[] = [];
 
-  const ranked: Candidate[] = [];
-  for (const window of selectableWindows(settings)) {
-    for (let start = window.start; start + durationMs <= window.end; start += SLOT_MS) {
-      if (start < now.getTime()) continue;
-      const participantIds = availability
-        .filter(({ slots }) => coversWholeMeeting(slots, start, durationMs))
-        .map(({ participantId }) => participantId);
-      if (participantIds.length < MIN_PARTICIPANTS) continue;
-      ranked.push({
-        startAt: new Date(start),
-        endAt: new Date(start + durationMs),
-        participantIds,
-      });
-    }
-  }
-  ranked.sort(
-    (a, b) =>
-      b.participantIds.length - a.participantIds.length ||
-      a.startAt.getTime() - b.startAt.getTime(),
-  );
-
-  const picked: Candidate[] = [];
-  for (const candidate of ranked) {
-    if (picked.length === MAX_CANDIDATES) break;
-    if (picked.some((p) => overlaps(p, candidate))) continue;
-    picked.push(candidate);
-  }
-  return picked;
-}
-
-/** 시작 슬롯부터 약속 길이 동안의 모든 슬롯이 가능한가 */
-function coversWholeMeeting(slots: Set<number>, start: number, durationMs: number): boolean {
-  for (let t = start; t < start + durationMs; t += SLOT_MS) {
-    if (!slots.has(t)) return false;
-  }
-  return true;
-}
-
-/** 반열림 구간끼리 겹치는가. 끝과 시작이 맞닿은 것은 겹침이 아니다(TIME-07-01). */
-function overlaps(a: Candidate, b: Candidate): boolean {
-  return a.startAt < b.endAt && b.startAt < a.endAt;
-}
-
-/**
- * 날짜마다 [그날 00:00 + 시작 분, 그날 00:00 + 종료 분) 구간을 만들고, 끝과 시작이 맞닿은 구간은 잇는다.
- * 하루 시간 범위가 00:00~24:00일 때만 날짜끼리 이어져 자정을 넘는 후보가 생긴다.
- */
-/** 후보를 만들 수 있는 반열림 구간 [start, end), epoch 밀리초 */
-type Window = { start: number; end: number };
-
-function selectableWindows(settings: CandidateSettings): Window[] {
-  const windows: Window[] = [];
   for (let date = settings.dateRangeStart; date <= settings.dateRangeEnd; date = addDays(date, 1)) {
     const midnight = kstMidnight(date).getTime();
-    const start = midnight + settings.dailyStartMinute * MINUTE_MS;
-    const end = midnight + settings.dailyEndMinute * MINUTE_MS;
-    const last = windows.at(-1);
-    if (last && last.end === start) last.end = end;
-    else windows.push({ start, end });
+    const dayStart = midnight + settings.dailyStartMinute * MINUTE_MS;
+    const dayEnd = midnight + settings.dailyEndMinute * MINUTE_MS;
+    let runStart: number | null = null;
+    for (let slot = dayStart; slot <= dayEnd; slot += SLOT_MS) {
+      const open =
+        slot < dayEnd &&
+        slot >= now.getTime() &&
+        sets.filter(({ slots }) => slots.has(slot)).length >= MIN_PARTICIPANTS;
+      if (open && runStart === null) runStart = slot;
+      if (!open && runStart !== null) {
+        blocks.push({
+          date,
+          startAt: new Date(runStart),
+          endAt: new Date(slot),
+          best: bestWindow(sets, runStart, slot, durationMs),
+        });
+        runStart = null;
+      }
+    }
   }
-  return windows;
+
+  const count = (b: CandidateBlock) => b.best?.participantIds.length ?? 0;
+  blocks.sort(
+    (a, b) =>
+      Number(b.best !== null) - Number(a.best !== null) ||
+      count(b) - count(a) ||
+      a.startAt.getTime() - b.startAt.getTime(),
+  );
+  return blocks.slice(0, MAX_BLOCKS);
 }
 
 /**
- * 확정된 시간 [startMs, startMs + 약속 길이)에 연속으로 가능한 참여자(입력 순서).
- * 확정 당시 목록은 저장하지 않고 현재 제출값으로 다시 계산한다. 2명 미만이 돼도 그대로 돌려준다(RESULT-13-02).
+ * 방장이 고른 시작 시각의 창. 보여주는 블록 안의 30분 경계 시작이고, 창 끝이 블록을 넘지 않고,
+ * 약속 길이 내내 함께 가능한 사람이 2명 이상이어야 한다. 아니면 null.
+ */
+export function pickWindow({
+  blocks,
+  respondents,
+  startMs,
+  durationMinutes,
+}: {
+  blocks: CandidateBlock[];
+  respondents: Respondent[];
+  startMs: number;
+  durationMinutes: number;
+}): Candidate | null {
+  const endMs = startMs + durationMinutes * MINUTE_MS;
+  const block = blocks.find(
+    (b) =>
+      b.best !== null &&
+      startMs >= b.startAt.getTime() &&
+      endMs <= b.endAt.getTime() &&
+      (startMs - b.startAt.getTime()) % SLOT_MS === 0,
+  );
+  if (!block) return null;
+  const participantIds = attendeesFor({ startMs, durationMinutes, respondents });
+  if (participantIds.length < MIN_PARTICIPANTS) return null;
+  return { startAt: new Date(startMs), endAt: new Date(endMs), participantIds };
+}
+
+/**
+ * [startMs, startMs + 약속 길이)에 연속으로 가능한 참여자(입력 순서).
+ * 확정된 일정의 참석자도 저장하지 않고 현재 제출값으로 다시 계산한다. 2명 미만이 돼도 그대로 돌려준다(RESULT-13-02).
  */
 export function attendeesFor({
   startMs,
@@ -131,9 +143,44 @@ export function attendeesFor({
   respondents: Respondent[];
 }): string[] {
   const durationMs = durationMinutes * MINUTE_MS;
-  return respondents
-    .filter((r) =>
-      coversWholeMeeting(new Set(r.slotStarts.map((d) => d.getTime())), startMs, durationMs),
-    )
-    .map((r) => r.participantId);
+  return toSets(respondents)
+    .filter(({ slots }) => coversWholeMeeting(slots, startMs, durationMs))
+    .map(({ participantId }) => participantId);
+}
+
+type RespondentSet = { participantId: string; slots: Set<number> };
+
+function toSets(respondents: Respondent[]): RespondentSet[] {
+  return respondents.map((r) => ({
+    participantId: r.participantId,
+    slots: new Set(r.slotStarts.map((d) => d.getTime())),
+  }));
+}
+
+/** 블록 [from, to) 안에서 함께 가능한 사람이 가장 많은 창(같으면 빠른 창). 2명 이상인 창이 없으면 null */
+function bestWindow(
+  sets: RespondentSet[],
+  from: number,
+  to: number,
+  durationMs: number,
+): Candidate | null {
+  let best: Candidate | null = null;
+  for (let start = from; start + durationMs <= to; start += SLOT_MS) {
+    const participantIds = sets
+      .filter(({ slots }) => coversWholeMeeting(slots, start, durationMs))
+      .map(({ participantId }) => participantId);
+    if (participantIds.length < MIN_PARTICIPANTS) continue;
+    if (!best || participantIds.length > best.participantIds.length) {
+      best = { startAt: new Date(start), endAt: new Date(start + durationMs), participantIds };
+    }
+  }
+  return best;
+}
+
+/** 시작 슬롯부터 약속 길이 동안의 모든 슬롯이 가능한가 */
+function coversWholeMeeting(slots: Set<number>, start: number, durationMs: number): boolean {
+  for (let t = start; t < start + durationMs; t += SLOT_MS) {
+    if (!slots.has(t)) return false;
+  }
+  return true;
 }
