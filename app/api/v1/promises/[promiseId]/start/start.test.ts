@@ -94,7 +94,7 @@ describe("모집 시작", () => {
     expect(res.body).toMatchObject({ code: "INVALID_REQUEST" });
   });
 
-  it("하루 시간 범위와 약속 길이를 보내도 기본값으로 저장한다", async () => {
+  it("하루 시간 범위는 보내도 기본값으로 저장하고, 약속 소요 시간은 보낸 값으로 저장한다", async () => {
     const host = createTestClient();
     const { promiseId } = await createDraftPromise(host);
 
@@ -108,8 +108,20 @@ describe("모집 시작", () => {
     );
 
     expect(res.body).toMatchObject({
-      settings: { dailyTimeRange: { startTime: "09:00", endTime: "24:00" }, durationMinutes: 120 },
+      settings: { dailyTimeRange: { startTime: "09:00", endTime: "24:00" }, durationMinutes: 30 },
     });
+  });
+
+  it("약속 소요 시간을 보내지 않으면 2시간, 30분 단위가 아니면 422", async () => {
+    const host = createTestClient();
+    const { promiseId } = await createDraftPromise(host);
+
+    const invalid = await startCollecting(host, promiseId, validStartBody({ durationMinutes: 45 }));
+    expect(invalid.status).toBe(422);
+    expect(invalid.body).toMatchObject({ details: { field: "durationMinutes" } });
+
+    const res = await startCollecting(host, promiseId, validStartBody());
+    expect(res.body).toMatchObject({ settings: { durationMinutes: 120 } });
   });
 
   describe("권한", () => {

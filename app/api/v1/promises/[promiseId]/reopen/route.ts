@@ -84,6 +84,7 @@ export async function POST(
         endDate: promise.dateRangeEnd!,
       },
       votingDeadlineAt: input.votingDeadlineAt,
+      durationMinutes: input.durationMinutes ?? promise.durationMinutes!,
     });
     if (!applied.ok) return { kind: "invalid", errors: applied.errors };
     // 다시 모집 중으로 돌리고 확정 일정을 비운다(STATE-API-06 처리 순서 3·8).

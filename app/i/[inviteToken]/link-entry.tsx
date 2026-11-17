@@ -18,6 +18,7 @@ import {
 import { CreatePromiseButton } from "@/app/create-promise-button";
 import { ConfirmedView } from "./confirmed-view";
 import { ReopenDialog } from "./reopen-dialog";
+import { DEFAULT_DURATION_MINUTES } from "@/lib/promises/start-settings";
 import { forgetLogin, membershipEnded, rememberLogin } from "./login-memory";
 import { HostRegistrationForm } from "./host-registration-form";
 import { InviteLink } from "./invite-link";
@@ -183,6 +184,7 @@ export function LinkEntry({ inviteToken }: { inviteToken: string }) {
               dateRangeStart: settings.dateRange.startDate!,
               dateRangeEnd: settings.dateRange.endDate!,
               participantLimit: settings.participantLimit,
+              durationMinutes: settings.durationMinutes ?? DEFAULT_DURATION_MINUTES,
               confirmed: true,
             }}
             onReopened={(summary) => {

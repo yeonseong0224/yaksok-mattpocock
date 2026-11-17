@@ -65,6 +65,7 @@ export async function applySettingsChange(
       dateRangeStart: new Date(`${settings.dateRangeStart}T00:00:00Z`),
       dateRangeEnd: new Date(`${settings.dateRangeEnd}T00:00:00Z`),
       votingDeadlineAt: settings.votingDeadlineAt,
+      durationMinutes: settings.durationMinutes,
     },
   });
   for (const { participantId, slots } of impact.removedSlots) {

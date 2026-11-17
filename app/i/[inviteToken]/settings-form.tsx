@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Button } from "@/app/_components/ui";
 import {
+  DEFAULT_DURATION_MINUTES,
   defaultVotingDeadline,
   validateStartSettings,
   type SettingsError,
@@ -19,7 +20,8 @@ import {
   type SettingsErrors,
 } from "./settings-fields";
 
-// 방장 설정 폼(Figma 01~03). 하루 시간 범위와 약속 길이는 받지 않는다(STATE-03-01 MVP 결정).
+// 방장 설정 폼(Figma 01~03). 하루 시간 범위는 받지 않는다(STATE-03-01 MVP 결정).
+// 약속 소요 시간은 30분 단위로 고른다. 기본 2시간(2026-11-17 결정).
 
 export function SettingsForm({
   promiseId,
@@ -38,6 +40,7 @@ export function SettingsForm({
   const [title, setTitle] = useState("");
   const [range, setRange] = useState<DateRange>({ startDate: null, endDate: null });
   const [participantLimit, setParticipantLimit] = useState(4);
+  const [durationMinutes, setDurationMinutes] = useState(DEFAULT_DURATION_MINUTES);
   const [deadline, setDeadline] = useState(() => splitKst(defaultVotingDeadline(new Date(), null)));
   const [deadlineTouched, setDeadlineTouched] = useState(false);
   const [errors, setErrors] = useState<SettingsErrors>({});
@@ -58,7 +61,7 @@ export function SettingsForm({
 
   async function submit(event: FormEvent) {
     event.preventDefault();
-    const body = settingsBody({ title, range, participantLimit, deadline });
+    const body = settingsBody({ title, range, participantLimit, deadline, durationMinutes });
     // 서버와 같은 규칙으로 먼저 확인한다. 최종 판정은 서버 시각으로 서버가 한다.
     const checked = validateStartSettings(body, new Date());
     if (!checked.ok) return setErrors(toErrors(checked.errors));
@@ -129,13 +132,14 @@ export function SettingsForm({
         <h1 className="text-2xl font-bold">새 약속 만들기</h1>
 
         <SettingsFields
-          values={{ title, range, participantLimit, deadline }}
+          values={{ title, range, participantLimit, deadline, durationMinutes }}
           errors={errors}
           now={now}
           onTitleChange={setTitle}
           onRangeChange={changeRange}
           onParticipantLimitChange={setParticipantLimit}
           onDeadlineChange={changeDeadline}
+          onDurationChange={setDurationMinutes}
         />
 
         <div className="flex flex-col items-end gap-3">

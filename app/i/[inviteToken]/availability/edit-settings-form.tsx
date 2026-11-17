@@ -41,6 +41,7 @@ export function EditSettingsForm({
     range: { startDate: settings.dateRangeStart, endDate: settings.dateRangeEnd },
     participantLimit: settings.participantLimit ?? participants.length,
     deadline: splitKst(new Date(settings.votingDeadlineAt)),
+    durationMinutes: settings.durationMinutes,
   }));
   const [errors, setErrors] = useState<SettingsErrors>({});
   // 범위를 줄이면 경고를 본 뒤 한 번 더 누르면 저장한다. 범위를 다시 고르면 풀린다.
@@ -104,6 +105,7 @@ export function EditSettingsForm({
         }}
         onParticipantLimitChange={(participantLimit) => change({ participantLimit })}
         onDeadlineChange={(deadline) => change({ deadline })}
+        onDurationChange={(durationMinutes) => change({ durationMinutes })}
       />
       <p className="text-xs text-muted">
         하루 시간 범위({settings.dailyStartTime}–{settings.dailyEndTime})와 약속 길이는 바꿀 수

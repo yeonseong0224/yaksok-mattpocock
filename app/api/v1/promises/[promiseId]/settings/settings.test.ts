@@ -202,7 +202,7 @@ describe("재설정", () => {
       expect(res.body).toMatchObject({ code: "INVALID_REQUEST" });
     });
 
-    it("하루 시간 범위·약속 길이는 모집 시작처럼 무시한다", async () => {
+    it("하루 시간 범위는 무시하고, 약속 소요 시간은 바꾼다(2026-11-17 결정)", async () => {
       const { host, promiseId } = await setUp();
 
       const res = await updateSettings(host, promiseId, {
@@ -216,7 +216,7 @@ describe("재설정", () => {
         settings: {
           title: "새 이름",
           dailyTimeRange: { startTime: "09:00", endTime: "24:00" },
-          durationMinutes: 120,
+          durationMinutes: 60,
         },
       });
     });

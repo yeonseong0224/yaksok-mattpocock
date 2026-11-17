@@ -374,7 +374,7 @@ if (!response.ok) {
 > ⚠️ 비즈니스 규칙 STATE-03-01은 "오늘부터 3개월"로 규정. 불일치 — 팀 확인 필요.
 
 - `dailyTimeRange.startTime`, `dailyTimeRange.endTime`: HH:mm, 필수. 시작은 00:00~23:30, 종료는 00:30~24:00의 30분 경계이며 시작 분 값은 종료 분 값보다 작아야 함
-- `durationMinutes`: integer, 필수. 30 이상·30분 배수이며 하루 시간 범위 이하
+- `durationMinutes`: integer, 선택(생략하면 120). 30 이상·30분 배수이며 하루 시간 범위(MVP 09:00~24:00, 900분) 이하(2026-11-17 결정)
 - `votingDeadlineAt`: 오프셋 포함 ISO 8601, 필수. 잠금 후 DB 시각보다 미래이고 마지막 후보 날짜 00:00(Asia/Seoul)보다 이전
 - `dateRangeLimitMonths`는 받지 않는다. 90일은 서버 공통 제한값이다.
 
@@ -473,7 +473,8 @@ if (!response.ok) {
 - `participantLimit`: 2~30명이며 현재 active 인원 이상. 모집 중에도 현재 active 인원까지 감소 허용(2026-11-11 결정, MEMBER-07-03)
 - `dateRange`: 오늘(KST)부터, 양 끝 포함 최대 90일(TIME-04-01~03)
 - `votingDeadlineAt`: 연장·단축 모두 허용. 잠금 후 서버 시각 + 30분 이상, 날짜 범위 마지막 날 00:00(KST) 미만의 30분 경계(TIME-14-01/02, 2026-11-11 결정 TIME-14-03/04)
-- `dailyTimeRange`, `durationMinutes`: 받지 않는다. 하루 시간 범위(09:00~24:00)와 약속 길이(2시간)는 MVP 고정이다(2026-11-11 결정, STATE-03-01) 보내도 모집 시작(STATE-API-02)처럼 무시한다. 생략한 마감은 다시 검증하지 않는다(그대로 유지)
+- `durationMinutes`: 선택. 모집 시작과 같은 규칙(2026-11-17 결정). 입력·제출 상태는 바뀌지 않고 후보만 다시 계산된다(STATE-04-02)
+- `dailyTimeRange`: 받지 않는다. 하루 시간 범위(09:00~24:00)는 MVP 고정이다(2026-11-11 결정, STATE-03-01) 보내도 무시한다. 생략한 마감은 다시 검증하지 않는다(그대로 유지)
 
 ```json
 {
@@ -862,7 +863,8 @@ closed·confirmed 약속을 collecting으로 다시 열고 새 마감과 선택 
 - `title`: 선택. 생략 시 유지. 1~30자(2026-11-12 결정)
 - `participantLimit`: 선택. 현재 active 인원 이상이면서 2~30명 범위에서 증가·감소 가능
 - `dateRange`: 선택. 생략 시 유지. 오늘(KST)부터, 양 끝 포함 최대 90일
-- `dailyTimeRange`, `durationMinutes`: 받지 않는다. MVP 고정(2026-11-11 결정, STATE-03-01)
+- `durationMinutes`: 선택. 모집 시작과 같은 규칙(2026-11-17 결정)
+- `dailyTimeRange`: 받지 않는다. MVP 고정(2026-11-11 결정, STATE-03-01)
 
 ```json
 {

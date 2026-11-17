@@ -6,6 +6,8 @@ import {
   canEndOn,
   canStartOn,
   DATE_RANGE_MAX_DAYS,
+  DURATION_MAX_MINUTES,
+  DURATION_MIN_MINUTES,
   PARTICIPANT_LIMIT_MAX,
   PARTICIPANT_LIMIT_MIN,
   type SettingsError,
@@ -14,9 +16,16 @@ import {
 } from "@/lib/promises/start-settings";
 import { kstDate, toKstIso } from "@/lib/time";
 import { ApiError } from "./api";
+import { durationLabel } from "./calendar";
 import { RangeCalendar, type DateRange } from "./range-calendar";
 
-// 약속 설정 입력칸(이름, 날짜 범위 달력, 정원, 마감). 모집 시작 폼(Figma 01~03)과 재설정 폼이 함께 쓴다.
+// 약속 설정 입력칸(이름, 날짜 범위 달력, 정원, 마감, 소요 시간). 모집 시작 폼(Figma 01~03)과 재설정 폼이 함께 쓴다.
+
+/** 약속 소요 시간 선택지: 30분 단위, 30분~하루 시간 범위 길이(2026-11-17 결정) */
+const DURATION_OPTIONS = Array.from(
+  { length: (DURATION_MAX_MINUTES - DURATION_MIN_MINUTES) / 30 + 1 },
+  (_, i) => DURATION_MIN_MINUTES + i * 30,
+);
 
 const TIME_OPTIONS = Array.from({ length: 48 }, (_, i) => {
   const hh = String(Math.floor(i / 2)).padStart(2, "0");
@@ -63,6 +72,8 @@ export type SettingsValues = {
   range: DateRange;
   participantLimit: number;
   deadline: Deadline;
+  /** 약속 소요 시간(분) */
+  durationMinutes: number;
 };
 
 /** 입력값 → 모집 시작·재설정 요청 본문 */
@@ -72,6 +83,7 @@ export function settingsBody(values: SettingsValues): StartSettingsInput {
     participantLimit: values.participantLimit,
     dateRange: { startDate: values.range.startDate ?? "", endDate: values.range.endDate ?? "" },
     votingDeadlineAt: `${values.deadline.date}T${values.deadline.time}:00+09:00`,
+    durationMinutes: values.durationMinutes,
   };
 }
 
@@ -85,6 +97,7 @@ export function SettingsFields({
   onRangeChange,
   onParticipantLimitChange,
   onDeadlineChange,
+  onDurationChange,
 }: {
   values: SettingsValues;
   errors: SettingsErrors;
@@ -97,8 +110,9 @@ export function SettingsFields({
   onRangeChange: (range: DateRange) => void;
   onParticipantLimitChange: (limit: number) => void;
   onDeadlineChange: (deadline: Deadline) => void;
+  onDurationChange: (minutes: number) => void;
 }) {
-  const { title, range, participantLimit, deadline } = values;
+  const { title, range, participantLimit, deadline, durationMinutes } = values;
   const today = kstDate(now);
   const firstMonth = (range.startDate ?? today).slice(0, 7);
 
@@ -200,6 +214,25 @@ export function SettingsFields({
           </div>
         </Labeled>
       </div>
+
+      <Labeled id="durationMinutes" label="④ 약속 소요 시간" error={errors.durationMinutes}>
+        <select
+          id="durationMinutes"
+          value={durationMinutes}
+          onChange={(e) => onDurationChange(Number(e.target.value))}
+          aria-describedby="durationMinutes-hint"
+          className={`${inputClass(Boolean(errors.durationMinutes))} md:max-w-60`}
+        >
+          {DURATION_OPTIONS.map((m) => (
+            <option key={m} value={m}>
+              {durationLabel(m)}
+            </option>
+          ))}
+        </select>
+        <p id="durationMinutes-hint" className="mt-2 text-xs text-muted">
+          이만큼 연속으로 모일 수 있는 시간을 후보로 찾아요.
+        </p>
+      </Labeled>
     </>
   );
 }
