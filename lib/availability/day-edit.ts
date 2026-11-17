@@ -1,5 +1,5 @@
-import { kstDate, kstMidnight, MINUTE_MS, SLOT_MS } from "@/lib/time";
-import { slotRanges } from "./repeat";
+import { addDays, kstDate, kstMidnight, MINUTE_MS, SLOT_MS, weekday } from "@/lib/time";
+import { slotRanges, type RepeatPlan } from "./repeat";
 import { isWithinRange, type SlotRange } from "./slots";
 
 // 모바일 날짜별 시간 수정 시트. 날짜를 누르면 그날 고른 시간을 시작·종료 구간으로 보여주고,
@@ -55,4 +55,47 @@ export function applyDayRanges({
     }
   }
   return next;
+}
+
+/**
+ * 반복 시트(vote-ui-extras 04): 고른 날짜마다 같은 시간 구간을 더하는 계획. 기존 선택에 합집합으로 더한다.
+ * 이미 고른 슬롯과 고칠 수 없는 슬롯(지남·범위 밖)은 빼고, 더할 것이 없는 날짜는 담지 않는다.
+ */
+export function planDayRanges({
+  selected,
+  dates,
+  ranges,
+  range,
+  now,
+}: {
+  selected: Iterable<number>;
+  dates: string[];
+  ranges: MinuteRange[];
+  range: SlotRange;
+  /** 서버 시각(serverTime) */
+  now: number;
+}): RepeatPlan {
+  const already = new Set(selected);
+  const result: RepeatPlan["dates"] = [];
+  for (const date of [...new Set(dates)].sort()) {
+    const midnight = kstMidnight(date).getTime();
+    const slots = new Set<number>();
+    for (const { start, end } of ranges) {
+      for (let minute = start; minute < end; minute += SLOT_MINUTES) {
+        const slot = midnight + minute * MINUTE_MS;
+        if (slot > now && isWithinRange(slot, range) && !already.has(slot)) slots.add(slot);
+      }
+    }
+    if (slots.size > 0) result.push({ date, slots: [...slots].sort((a, b) => a - b) });
+  }
+  return { dates: result, slots: result.flatMap((d) => d.slots) };
+}
+
+/** from부터 until까지(양 끝 포함) 고른 요일(0 = 일요일)의 날짜 */
+export function datesOnWeekdays(from: string, until: string, weekdays: number[]): string[] {
+  const dates: string[] = [];
+  for (let date = from; date <= until; date = addDays(date, 1)) {
+    if (weekdays.includes(weekday(date))) dates.push(date);
+  }
+  return dates;
 }
