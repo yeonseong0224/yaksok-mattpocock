@@ -20,6 +20,7 @@ import { forgetLogin } from "./login-memory";
 
 // 참여자 명단(닉네임, 방장 표시)과 로그아웃(MEMBER-API-06·07). 제출 여부는 보여주지 않는다(MEMBER-08-02).
 // 맨 아래에 "이 약속에서 나가기"(STATE-API-08, 약속 관리 티켓 06)를 둔다.
+// compact(가능 시간 화면 사이드바·모바일 서랍)는 이름을 작은 칩으로 늘어놓고, 로그아웃·나가기를 한 줄에 둔다(2026-11-17 요청).
 export function ParticipantRoster({
   promiseId,
   me,
@@ -66,73 +67,29 @@ export function ParticipantRoster({
     }
   }
 
-  return (
-    <section
-      className={`rounded-2xl border border-line bg-surface ${compact ? "p-4" : "mx-auto mt-6 max-w-lg p-6 sm:p-7"}`}
+  const removeButton = (p: { participantId: string; nickname: string }, label: string) => (
+    <button
+      type="button"
+      aria-label={`${p.nickname} 내보내기`}
+      onClick={(e) =>
+        setRemoving({
+          participantId: p.participantId,
+          nickname: p.nickname,
+          opener: e.currentTarget,
+        })
+      }
+      className={
+        compact
+          ? "-mr-1 flex h-6 w-6 items-center justify-center rounded-full text-muted hover:bg-danger/10 hover:text-danger"
+          : "ml-auto text-xs text-danger underline-offset-2 hover:underline"
+      }
     >
-      <div className="flex items-baseline justify-between">
-        <h2 ref={headingRef} tabIndex={-1} className="text-lg font-bold outline-none">
-          참여자
-        </h2>
-        {roster.data && (
-          <p className="text-sm text-muted">
-            {roster.data.currentParticipantCount}
-            {roster.data.participantLimit ? ` / ${roster.data.participantLimit}명` : "명"}
-          </p>
-        )}
-      </div>
-      <ul className="mt-3 divide-y divide-line">
-        {roster.data?.participants.map((p) => (
-          <li key={p.participantId} className="flex items-center gap-2 py-2.5 text-sm">
-            <span>{p.nickname}</span>
-            {p.role === "host" && (
-              <span className="rounded bg-brand/15 px-1.5 py-0.5 text-xs text-brand-ink">방장</span>
-            )}
-            {p.isMe && <span className="text-xs text-muted">나</span>}
-            {canRemove && !p.isMe && (
-              <button
-                type="button"
-                onClick={(e) =>
-                  setRemoving({
-                    participantId: p.participantId,
-                    nickname: p.nickname,
-                    opener: e.currentTarget,
-                  })
-                }
-                className="ml-auto text-xs text-danger underline-offset-2 hover:underline"
-              >
-                내보내기
-              </button>
-            )}
-          </li>
-        ))}
-        {!roster.data && <li className="py-2.5 text-sm text-muted">불러오는 중…</li>}
-      </ul>
+      {label}
+    </button>
+  );
 
-      <div className="mt-5 flex items-center justify-between gap-3 border-t border-line pt-4">
-        <p className="text-sm text-muted">
-          {me.nickname}
-          {me.role === "host" ? " · 방장" : " · 참여자"}
-        </p>
-        <Button variant="secondary" onClick={logOut} disabled={pending} className="max-w-32">
-          로그아웃
-        </Button>
-      </div>
-      {failed && (
-        <p role="alert" className="mt-2 text-right text-sm text-danger">
-          로그아웃하지 못했어요. 다시 시도해 주세요.
-        </p>
-      )}
-      <button
-        ref={leaveRef}
-        type="button"
-        onClick={() => setLeaving(true)}
-        // 방장에게는 승계 대상(또는 약속 취소)을 알려야 하니 명단을 받은 뒤에 연다.
-        disabled={!roster.data}
-        className="mt-3 disabled:text-muted w-full text-right text-sm text-danger underline-offset-2 hover:underline"
-      >
-        이 약속에서 나가기
-      </button>
+  const dialogs = (
+    <>
       {removing && (
         <DangerConfirmDialog
           title={`${removing.nickname}님을 내보낼까요?`}
@@ -177,6 +134,120 @@ export function ParticipantRoster({
           }}
         />
       )}
+    </>
+  );
+
+  if (compact) {
+    return (
+      <section className="rounded-xl border border-line bg-surface p-3">
+        <div className="flex items-baseline justify-between">
+          <h2 ref={headingRef} tabIndex={-1} className="text-sm font-bold outline-none">
+            참여자
+          </h2>
+          {roster.data && (
+            <p className="text-xs text-muted">
+              {roster.data.currentParticipantCount}
+              {roster.data.participantLimit ? ` / ${roster.data.participantLimit}명` : "명"}
+            </p>
+          )}
+        </div>
+        <ul className="mt-2 flex flex-wrap gap-1.5">
+          {roster.data?.participants.map((p) => (
+            <li
+              key={p.participantId}
+              className={`flex items-center gap-1 rounded-full border py-0.5 pr-2 pl-2.5 text-xs ${
+                p.isMe ? "border-brand/40 bg-brand/10 text-brand-ink" : "border-line"
+              }`}
+            >
+              <span>{p.nickname}</span>
+              {p.role === "host" && <span className="text-[10px] text-brand-ink">방장</span>}
+              {p.isMe && <span className="text-[10px] text-muted">나</span>}
+              {canRemove && !p.isMe && removeButton(p, "✕")}
+            </li>
+          ))}
+          {!roster.data && <li className="text-xs text-muted">불러오는 중…</li>}
+        </ul>
+        <div className="mt-3 flex items-center justify-between gap-2 border-t border-line pt-2.5 text-xs">
+          <button
+            type="button"
+            onClick={logOut}
+            disabled={pending}
+            className="h-8 rounded-lg border border-line px-3 text-brand-ink hover:bg-canvas disabled:text-muted"
+          >
+            로그아웃
+          </button>
+          <button
+            ref={leaveRef}
+            type="button"
+            onClick={() => setLeaving(true)}
+            disabled={!roster.data}
+            className="text-danger underline-offset-2 hover:underline disabled:text-muted"
+          >
+            이 약속에서 나가기
+          </button>
+        </div>
+        {failed && (
+          <p role="alert" className="mt-2 text-xs text-danger">
+            로그아웃하지 못했어요. 다시 시도해 주세요.
+          </p>
+        )}
+        {dialogs}
+      </section>
+    );
+  }
+
+  return (
+    <section className="mx-auto mt-6 max-w-lg rounded-2xl border border-line bg-surface p-6 sm:p-7">
+      <div className="flex items-baseline justify-between">
+        <h2 ref={headingRef} tabIndex={-1} className="text-lg font-bold outline-none">
+          참여자
+        </h2>
+        {roster.data && (
+          <p className="text-sm text-muted">
+            {roster.data.currentParticipantCount}
+            {roster.data.participantLimit ? ` / ${roster.data.participantLimit}명` : "명"}
+          </p>
+        )}
+      </div>
+      <ul className="mt-3 divide-y divide-line">
+        {roster.data?.participants.map((p) => (
+          <li key={p.participantId} className="flex items-center gap-2 py-2.5 text-sm">
+            <span>{p.nickname}</span>
+            {p.role === "host" && (
+              <span className="rounded bg-brand/15 px-1.5 py-0.5 text-xs text-brand-ink">방장</span>
+            )}
+            {p.isMe && <span className="text-xs text-muted">나</span>}
+            {canRemove && !p.isMe && removeButton(p, "내보내기")}
+          </li>
+        ))}
+        {!roster.data && <li className="py-2.5 text-sm text-muted">불러오는 중…</li>}
+      </ul>
+
+      <div className="mt-5 flex items-center justify-between gap-3 border-t border-line pt-4">
+        <p className="text-sm text-muted">
+          {me.nickname}
+          {me.role === "host" ? " · 방장" : " · 참여자"}
+        </p>
+        <Button variant="secondary" onClick={logOut} disabled={pending} className="max-w-32">
+          로그아웃
+        </Button>
+      </div>
+      {failed && (
+        <p role="alert" className="mt-2 text-right text-sm text-danger">
+          로그아웃하지 못했어요. 다시 시도해 주세요.
+        </p>
+      )}
+      <button
+        ref={leaveRef}
+        type="button"
+        onClick={() => setLeaving(true)}
+        // 방장에게는 승계 대상(또는 약속 취소)을 알려야 하니 명단을 받은 뒤에 연다.
+        disabled={!roster.data}
+        className="mt-3 disabled:text-muted w-full text-right text-sm text-danger underline-offset-2 hover:underline"
+      >
+        이 약속에서 나가기
+      </button>
+      {dialogs}
     </section>
   );
 }
