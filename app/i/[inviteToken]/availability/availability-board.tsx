@@ -37,6 +37,7 @@ import { MiniCalendar } from "./mini-calendar";
 import { toSortedKstIsos, useLocalDraft } from "./local-draft";
 import { RepeatDialog } from "./repeat-dialog";
 import { RepeatMenu, type RepeatMode } from "./repeat-menu";
+import { RepeatPlannerSheet } from "./repeat-planner-sheet";
 import { RepeatSheet, type RepeatSource } from "./repeat-sheet";
 import { TimeDetailDialog } from "./time-detail-dialog";
 import { WeekGrid, type RepeatTrigger, type SlotView, type TouchMode } from "./week-grid";
@@ -59,12 +60,10 @@ export type Notice = { tone: "info" | "error"; text: string } | null;
 /** 반복 메뉴·팝업의 원본 날짜. origin은 닫을 때 포커스를 돌려줄 요소다. */
 type RepeatOrigin = { date: string; origin: HTMLElement };
 /**
- * 반복 메뉴를 연 방법. mouse(우클릭)는 그 자리의 팝업 메뉴, touch(길게 누르기)와 button(모바일 "반복 사용")은
- * 바텀시트로 연다. button은 원본 날짜가 없어 시트에서 먼저 고른다.
+ * 반복 메뉴를 연 방법. mouse(우클릭)는 그 자리의 팝업 메뉴, touch(길게 누르기)는 바텀시트로 연다.
+ * 모바일 "반복" 버튼은 원본 날짜 없이 시간·날짜를 직접 고르는 시트(RepeatPlannerSheet)를 따로 연다.
  */
-type RepeatOpen =
-  | (RepeatOrigin & { trigger: RepeatTrigger; x: number; y: number })
-  | { trigger: "button"; origin: HTMLElement };
+type RepeatOpen = RepeatOrigin & { trigger: RepeatTrigger; x: number; y: number };
 
 export function AvailabilityBoard({
   promiseId,
@@ -168,6 +167,8 @@ export function AvailabilityBoard({
   // 시간 수정 시트를 연 날짜, 선택 내역 시트
   const [editingDay, setEditingDay] = useState<string | null>(null);
   const [summaryOpen, setSummaryOpen] = useState(false);
+  // 모바일 "반복" 버튼으로 연 반복 시트(연 버튼, vote-ui-extras 04)
+  const [planningFrom, setPlanningFrom] = useState<HTMLElement | null>(null);
   // 후보 목록과 같은 키라 한 번만 조회된다. 확정 버튼을 보여줄 슬롯(표시 후보의 시작)을 알기 위해 쓴다.
   const candidates = useSWR<CandidateList, ApiError>(candidatesUrl(promiseId), getJson, {
     refreshInterval: POLL_MS,
@@ -718,8 +719,8 @@ export function AvailabilityBoard({
                 <div className="w-28 shrink-0">
                   <Button
                     variant="secondary"
-                    disabled={!editable || selected.size === 0}
-                    onClick={(e) => setRepeatMenu({ trigger: "button", origin: e.currentTarget })}
+                    disabled={!editable}
+                    onClick={(e) => setPlanningFrom(e.currentTarget)}
                   >
                     ↻ 반복
                   </Button>
@@ -853,22 +854,6 @@ export function AvailabilityBoard({
                 touchMode={touchMode}
               />
             </div>
-
-            {/* 모바일: 반복 사용·제출은 화면 아래에 늘 보인다(Figma 23 "하단 제출 버튼은 항상 접근 가능") */}
-            {editable && tab === "mine" && (
-              <div className="sticky bottom-0 z-10 -mx-4 mt-3 grid grid-cols-2 gap-2 border-t border-line bg-surface px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:hidden">
-                <Button
-                  variant="secondary"
-                  disabled={selected.size === 0}
-                  onClick={(e) => setRepeatMenu({ trigger: "button", origin: e.currentTarget })}
-                >
-                  반복 사용
-                </Button>
-                <Button onClick={submit} disabled={pending}>
-                  {submitLabel}
-                </Button>
-              </div>
-            )}
 
             <BottomBar>
               <div className="text-sm text-muted">
@@ -1089,10 +1074,32 @@ export function AvailabilityBoard({
           onClose={() => setConfirming(null)}
         />
       )}
-      {repeatMenu && editable && repeatMenu.trigger !== "mouse" && (
+      {planningFrom && editable && (
+        <RepeatPlannerSheet
+          selected={selected}
+          initialRanges={(() => {
+            const first = [...selected].filter((ms) => ms > serverNow).sort((a, b) => a - b)[0];
+            return first === undefined ? [] : dayMinuteRanges(selected, kstDate(new Date(first)));
+          })()}
+          range={slotRange}
+          now={serverNow}
+          today={today}
+          onApply={(plan) => {
+            applySelection(plan.slots, true);
+            focusOpener(planningFrom);
+            setPlanningFrom(null);
+            setNotice({ tone: "info", text: "반복 시간을 추가했어요 · 제출하면 응답이 저장돼요" });
+          }}
+          onClose={() => {
+            focusOpener(planningFrom);
+            setPlanningFrom(null);
+          }}
+        />
+      )}
+      {repeatMenu && editable && repeatMenu.trigger === "touch" && (
         <RepeatSheet
           sources={repeatSources(selected)}
-          initialDate={repeatMenu.trigger === "touch" ? repeatMenu.date : undefined}
+          initialDate={repeatMenu.date}
           onChoose={(date, mode) => {
             setRepeatMenu(null);
             setRepeating({ date, origin: repeatMenu.origin, mode });

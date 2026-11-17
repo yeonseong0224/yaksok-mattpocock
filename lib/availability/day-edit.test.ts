@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { applyDayRanges, dayMinuteRanges, dayRangesError } from "./day-edit";
+import {
+  applyDayRanges,
+  datesOnWeekdays,
+  dayMinuteRanges,
+  dayRangesError,
+  planDayRanges,
+} from "./day-edit";
 import type { SlotRange } from "./slots";
 
 // 모바일 날짜별 시간 수정 시트(모바일 시간표 개편). 그날의 선택을 시작·종료 시간 구간으로 바꿔 쓴다.
@@ -124,5 +130,62 @@ describe("applyDayRanges", () => {
       now: NOW,
     });
     expect(iso(next)).toEqual([]);
+  });
+});
+
+describe("planDayRanges", () => {
+  it("고른 날짜마다 같은 시간 구간을 더하고, 날짜순으로 담는다", () => {
+    const plan = planDayRanges({
+      selected: [],
+      dates: ["2026-10-08", "2026-10-06"],
+      ranges: [{ start: 1080, end: 1140 }],
+      range: RANGE,
+      now: NOW,
+    });
+    expect(plan.dates.map((d) => d.date)).toEqual(["2026-10-06", "2026-10-08"]);
+    expect(iso(plan.slots)).toEqual(
+      iso([at("10-06T18:00"), at("10-06T18:30"), at("10-08T18:00"), at("10-08T18:30")]),
+    );
+  });
+
+  it("이미 고른 슬롯, 지난 슬롯, 범위 밖 날짜·시간은 빼고, 더할 게 없는 날짜는 담지 않는다", () => {
+    const plan = planDayRanges({
+      selected: [at("10-06T18:00")],
+      dates: ["2026-10-05", "2026-10-06", "2026-11-01"],
+      ranges: [
+        { start: 480, end: 600 }, // 08:00~10:00, 하루 시작은 09:00
+        { start: 690, end: 750 }, // 11:30~12:30, 10-05는 12:00(지금)까지 지난 시간
+        { start: 1080, end: 1110 },
+      ],
+      range: RANGE,
+      now: NOW,
+    });
+    expect(plan.dates.map((d) => d.date)).toEqual(["2026-10-05", "2026-10-06"]);
+    expect(iso(plan.slots)).toEqual(
+      iso([
+        at("10-05T18:00"),
+        at("10-06T09:00"),
+        at("10-06T09:30"),
+        at("10-06T11:30"),
+        at("10-06T12:00"),
+      ]),
+    );
+  });
+});
+
+describe("datesOnWeekdays", () => {
+  it("시작일과 종료일을 포함해 고른 요일의 날짜를 돌려준다", () => {
+    // 2026-10-06은 화요일(2), 10-08은 목요일(4)
+    expect(datesOnWeekdays("2026-10-06", "2026-10-15", [2, 4])).toEqual([
+      "2026-10-06",
+      "2026-10-08",
+      "2026-10-13",
+      "2026-10-15",
+    ]);
+  });
+
+  it("요일을 고르지 않았거나 종료일이 시작일보다 앞이면 빈 목록", () => {
+    expect(datesOnWeekdays("2026-10-06", "2026-10-31", [])).toEqual([]);
+    expect(datesOnWeekdays("2026-10-06", "2026-10-05", [2])).toEqual([]);
   });
 });
