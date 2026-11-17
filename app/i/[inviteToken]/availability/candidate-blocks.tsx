@@ -1,6 +1,13 @@
 "use client";
 
-import { useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
+import {
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type PointerEvent,
+  type ReactNode,
+} from "react";
 import useSWR from "swr";
 import { Button } from "@/app/_components/ui";
 import { attendeesFor, type Respondent } from "@/lib/candidates/compute-candidates";
@@ -134,14 +141,9 @@ export function CandidateBlocksPanel({
     }
   }
 
+  // 상세 시간을 정한 바로 아래(펼친 상세 안 맨 아래)에 둔다(2026-11-17 요청).
   const footer = onConfirm && (
-    <div
-      className={
-        variant === "screen"
-          ? "border-t border-line bg-surface px-5 pt-3.5 pb-[max(1rem,env(safe-area-inset-bottom))]"
-          : "mt-3"
-      }
-    >
+    <div className="mt-3.5 border-t border-line pt-3.5">
       <p className="mb-3 text-[12.5px] text-muted" aria-live="polite">
         {!opened || !chosen
           ? "날짜를 고르면 상세 시간을 정할 수 있어요"
@@ -212,7 +214,9 @@ export function CandidateBlocksPanel({
                     start={start}
                     onStartChange={setStart}
                     onShowWeek={() => onPick(block.date)}
-                  />
+                  >
+                    {footer}
+                  </WindowPicker>
                 )}
               </li>
             );
@@ -229,10 +233,9 @@ export function CandidateBlocksPanel({
   if (variant === "screen") {
     return (
       <div className="flex min-h-0 flex-1 flex-col">
-        <div className="min-h-0 flex-1 overflow-y-auto bg-canvas px-5 pt-1 pb-6 scrollbar-none">
+        <div className="min-h-0 flex-1 overflow-y-auto bg-canvas px-5 pt-1 pb-[max(1.5rem,env(safe-area-inset-bottom))] scrollbar-none">
           {list}
         </div>
-        {footer}
       </div>
     );
   }
@@ -253,7 +256,6 @@ export function CandidateBlocksPanel({
         </p>
       </div>
       {list}
-      {footer}
     </section>
   );
 }
@@ -342,6 +344,7 @@ function WindowPicker({
   start,
   onStartChange,
   onShowWeek,
+  children,
 }: {
   block: CandidateBlock;
   participants: Participants;
@@ -351,6 +354,8 @@ function WindowPicker({
   start: number;
   onStartChange: (startMs: number) => void;
   onShowWeek: () => void;
+  /** 맨 아래(확정 줄) */
+  children?: ReactNode;
 }) {
   const from = Date.parse(block.startAt);
   const to = Date.parse(block.endAt);
@@ -454,6 +459,7 @@ function WindowPicker({
           시간표에서 보기
         </button>
       </div>
+      {children}
     </div>
   );
 }
