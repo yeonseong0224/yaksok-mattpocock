@@ -164,6 +164,28 @@ describe("모집 시작 설정 검증", () => {
     });
   });
 
+  describe("약속 소요 시간", () => {
+    it("정하지 않으면 2시간으로 저장한다", () => {
+      const result = validateStartSettings(input(), NOW);
+      expect(result.ok && result.settings.durationMinutes).toBe(120);
+    });
+
+    it("30분 단위로 30분부터 하루 시간 범위 길이(15시간)까지 정할 수 있다", () => {
+      for (const durationMinutes of [30, 90, 240, 900]) {
+        const result = validateStartSettings(input({ durationMinutes }), NOW);
+        expect(result.ok && result.settings.durationMinutes).toBe(durationMinutes);
+      }
+    });
+
+    it("30분 단위가 아니거나 범위를 벗어나면 거부한다", () => {
+      for (const durationMinutes of [0, 45, 930, -30, 60.5]) {
+        expect(fieldsOf(validateStartSettings(input({ durationMinutes }), NOW))).toEqual([
+          "durationMinutes",
+        ]);
+      }
+    });
+  });
+
   it("어긋난 필드를 모두 알려준다", () => {
     const result = validateStartSettings(
       input({ title: "", participantLimit: 99, votingDeadlineAt: "2026-11-10T15:00:00+09:00" }),

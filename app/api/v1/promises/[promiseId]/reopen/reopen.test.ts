@@ -93,7 +93,7 @@ describe("재조율", () => {
     });
   });
 
-  it("이름·날짜 범위·정원도 함께 바꿀 수 있고, 범위가 늘면 제출 상태가 풀려도 남은 선택은 그대로다", async () => {
+  it("이름·날짜 범위·정원·소요 시간도 함께 바꿀 수 있고, 범위가 늘면 제출 상태가 풀려도 남은 선택은 그대로다", async () => {
     const { host, member, promiseId } = await closedPromise();
 
     const res = await reopenPromise(host, promiseId, {
@@ -101,12 +101,14 @@ describe("재조율", () => {
       dateRange: { startDate, endDate: addDays(endDate, 3) },
       participantLimit: 6,
       title: "다시 모여요",
+      durationMinutes: 90,
     });
 
     expect(res.body).toMatchObject({
       settings: {
         title: "다시 모여요",
         participantLimit: 6,
+        durationMinutes: 90,
         dateRange: { endDate: addDays(endDate, 3) },
       },
       changeImpact: {

@@ -1181,6 +1181,7 @@ export function AvailabilityBoard({
             dateRangeStart: settings.dateRangeStart,
             dateRangeEnd: settings.dateRangeEnd,
             participantLimit,
+            durationMinutes: settings.durationMinutes,
             confirmed: data.status === "confirmed",
           }}
           onReopened={(summary) => {

@@ -39,6 +39,7 @@ export type ReopenSettings = {
   dateRangeStart: string;
   dateRangeEnd: string;
   participantLimit: number | null;
+  durationMinutes: number;
   /** 확정된 약속이면 확정 일정이 해제된다고 알린다 */
   confirmed: boolean;
 };
@@ -66,6 +67,7 @@ export function ReopenDialog({
     participantLimit: settings.participantLimit ?? PARTICIPANT_LIMIT_MIN,
     // 지난 마감 대신 새 마감 기본값(지금 + 24시간, 마지막 날 00:00 전)에서 시작한다.
     deadline: splitKst(defaultVotingDeadline(new Date(), settings.dateRangeEnd)),
+    durationMinutes: settings.durationMinutes,
   }));
   const [errors, setErrors] = useState<SettingsErrors>({});
   const [confirmShrink, setConfirmShrink] = useState(false);
@@ -153,6 +155,7 @@ export function ReopenDialog({
             }}
             onParticipantLimitChange={(participantLimit) => change({ participantLimit })}
             onDeadlineChange={(deadline) => change({ deadline })}
+            onDurationChange={(durationMinutes) => change({ durationMinutes })}
           />
           <p className="text-xs text-muted">
             하루 시간 범위와 약속 길이는 그대로예요. 정원은 지금 참여한 {activeCount}

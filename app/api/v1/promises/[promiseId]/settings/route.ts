@@ -43,7 +43,7 @@ type Outcome =
       cookie: SessionCookie | null;
     };
 
-// STATE-API-03 모집 중 설정 변경(재설정). 방장만, 모집 중이고 마감 전일 때 이름·날짜 범위·정원·마감을 바꾼다.
+// STATE-API-03 모집 중 설정 변경(재설정). 방장만, 모집 중이고 마감 전일 때 이름·날짜 범위·정원·마감·소요 시간을 바꾼다.
 // 범위가 바뀌면 영향 계산대로 슬롯·버전·제출 상태를 한 트랜잭션에서 고친다(applySettingsChange).
 export async function PATCH(
   request: NextRequest,
@@ -91,6 +91,7 @@ export async function PATCH(
           endDate: promise.dateRangeEnd!,
         },
         votingDeadlineAt: patch.votingDeadlineAt ?? toKstIso(promise.votingDeadlineAt!),
+        durationMinutes: patch.durationMinutes ?? promise.durationMinutes!,
       },
       { keptVotingDeadline: promise.votingDeadlineAt! },
     );

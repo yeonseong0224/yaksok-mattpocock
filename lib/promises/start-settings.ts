@@ -12,10 +12,13 @@ export const DATE_RANGE_MAX_DAYS = 90;
 /** 마감은 처리 시각보다 이만큼 이상 뒤여야 한다(TIME-14-01) */
 export const DEADLINE_MIN_LEAD_MINUTES = 30;
 
-/** MVP 고정값(STATE-03-01): 하루 시간 범위 09:00~24:00, 약속 길이 2시간 */
+/** MVP 고정값(STATE-03-01): 하루 시간 범위 09:00~24:00 */
 export const MVP_DAILY_START_MINUTE = 540;
 export const MVP_DAILY_END_MINUTE = 1440;
-export const MVP_DURATION_MINUTES = 120;
+/** 약속 소요 시간 기본값 2시간. 방장이 30분 단위로 30분~하루 시간 범위 길이까지 정한다(2026-11-17 결정). */
+export const DEFAULT_DURATION_MINUTES = 120;
+export const DURATION_MIN_MINUTES = 30;
+export const DURATION_MAX_MINUTES = MVP_DAILY_END_MINUTE - MVP_DAILY_START_MINUTE;
 
 const ISO_WITH_OFFSET = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d{1,3})?)?(Z|[+-]\d{2}:\d{2})$/;
 
@@ -24,6 +27,8 @@ export type StartSettingsInput = {
   participantLimit: number;
   dateRange: { startDate: string; endDate: string };
   votingDeadlineAt: string;
+  /** 약속 소요 시간(분). 생략하면 기본값 2시간 */
+  durationMinutes?: number;
 };
 
 export type StartSettings = {
@@ -37,7 +42,8 @@ export type StartSettings = {
   votingDeadlineAt: Date;
 };
 
-export type SettingsField = "title" | "participantLimit" | "dateRange" | "votingDeadlineAt";
+export type SettingsField =
+  "title" | "participantLimit" | "dateRange" | "votingDeadlineAt" | "durationMinutes";
 export type SettingsError = {
   field: SettingsField;
   message: string;
@@ -50,13 +56,20 @@ export type StartSettingsResult =
 
 /** 요청 본문이 모양(타입)만 맞는지 본다. 값 규칙은 `validateStartSettings`가 본다. 어긋나면 null. */
 export function parseStartSettingsBody(body: Record<string, unknown>): StartSettingsInput | null {
-  const { title, participantLimit, dateRange, votingDeadlineAt } = body;
+  const { title, participantLimit, dateRange, votingDeadlineAt, durationMinutes } = body;
   if (typeof title !== "string" || typeof participantLimit !== "number") return null;
   if (typeof votingDeadlineAt !== "string") return null;
   if (typeof dateRange !== "object" || dateRange === null) return null;
   const { startDate, endDate } = dateRange as Record<string, unknown>;
   if (typeof startDate !== "string" || typeof endDate !== "string") return null;
-  return { title, participantLimit, dateRange: { startDate, endDate }, votingDeadlineAt };
+  if (durationMinutes !== undefined && typeof durationMinutes !== "number") return null;
+  return {
+    title,
+    participantLimit,
+    dateRange: { startDate, endDate },
+    votingDeadlineAt,
+    ...(durationMinutes !== undefined ? { durationMinutes } : {}),
+  };
 }
 
 export function validateStartSettings(
@@ -104,6 +117,19 @@ export function validateStartSettings(
   const deadlineError = votingDeadlineError(deadline, lastDayMidnight, now, deadlineKept);
   if (deadlineError) errors.push({ field: "votingDeadlineAt", message: deadlineError });
 
+  const durationMinutes = input.durationMinutes ?? DEFAULT_DURATION_MINUTES;
+  if (
+    !Number.isInteger(durationMinutes) ||
+    durationMinutes % 30 !== 0 ||
+    durationMinutes < DURATION_MIN_MINUTES ||
+    durationMinutes > DURATION_MAX_MINUTES
+  ) {
+    errors.push({
+      field: "durationMinutes",
+      message: `약속 소요 시간은 30분 단위로 ${DURATION_MIN_MINUTES}분부터 ${DURATION_MAX_MINUTES / 60}시간까지 정해 주세요.`,
+    });
+  }
+
   if (errors.length > 0) return { ok: false, errors };
   return {
     ok: true,
@@ -114,7 +140,7 @@ export function validateStartSettings(
       dateRangeEnd: endDate,
       dailyStartMinute: MVP_DAILY_START_MINUTE,
       dailyEndMinute: MVP_DAILY_END_MINUTE,
-      durationMinutes: MVP_DURATION_MINUTES,
+      durationMinutes,
       votingDeadlineAt: deadline!,
     },
   };
@@ -205,16 +231,21 @@ export function defaultVotingDeadline(now: Date, endDate: string | null): Date {
 
 /**
  * 재설정 요청 본문(STATE-API-03): 바꿀 필드만 보낸다. 생략한 값은 지금 값을 유지한다.
- * 바꿀 수 있는 필드가 하나 이상 있어야 한다. 하루 시간 범위·약속 길이는 모집 시작처럼 무시한다(MVP 고정).
+ * 바꿀 수 있는 필드가 하나 이상 있어야 한다. 하루 시간 범위는 모집 시작처럼 무시한다(MVP 고정).
+ * 약속 소요 시간은 바꿀 수 있다(2026-11-17 결정).
  * 형식이 어긋나면 null.
  */
 export function parseSettingsPatchBody(
   body: Record<string, unknown>,
 ): Partial<StartSettingsInput> | null {
-  const fields = ["title", "participantLimit", "dateRange", "votingDeadlineAt"];
+  const fields = ["title", "participantLimit", "dateRange", "votingDeadlineAt", "durationMinutes"];
   if (!fields.some((k) => k in body)) return null;
   const patch: Partial<StartSettingsInput> = {};
-  const { title, participantLimit, dateRange, votingDeadlineAt } = body;
+  const { title, participantLimit, dateRange, votingDeadlineAt, durationMinutes } = body;
+  if ("durationMinutes" in body) {
+    if (typeof durationMinutes !== "number") return null;
+    patch.durationMinutes = durationMinutes;
+  }
   if ("title" in body) {
     if (typeof title !== "string") return null;
     patch.title = title;
@@ -237,8 +268,8 @@ export function parseSettingsPatchBody(
 }
 
 /**
- * 재조율 요청 본문(STATE-API-06): 새 마감은 필수, 약속 이름·날짜 범위·정원은 선택(생략하면 유지).
- * 하루 시간 범위·약속 길이는 무시한다. 형식이 어긋나면 null.
+ * 재조율 요청 본문(STATE-API-06): 새 마감은 필수, 약속 이름·날짜 범위·정원·소요 시간은 선택(생략하면 유지).
+ * 하루 시간 범위는 무시한다. 형식이 어긋나면 null.
  */
 export function parseReopenBody(
   body: Record<string, unknown>,
