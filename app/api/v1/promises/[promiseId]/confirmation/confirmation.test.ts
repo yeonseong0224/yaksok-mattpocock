@@ -11,7 +11,7 @@ import {
   submitAvailability,
 } from "@/test/flows";
 
-// STATE-API-05 확정(RESULT-11-02·12-01·12-02·13-01·13-02, STATE-07-01)
+// STATE-API-05 확정(RESULT-11-02·12-01·12-02·13-01·13-02, STATE-07-01, candidate-blocks 03)
 
 // 약속 길이 2시간. 14:00~16:00 후보에는 14:00·14:30·15:00·15:30이 모두 필요하다.
 const from14to16 = [slotAt(0, "14:00"), slotAt(0, "14:30"), slotAt(0, "15:00"), slotAt(0, "15:30")];
@@ -40,7 +40,7 @@ async function submit(client: TestClient, promiseId: string, slots: string[]) {
 }
 
 describe("확정", () => {
-  it("방장이 마감된 약속에서 표시된 후보를 고르면 확정되고, 모두가 시작·끝과 참석 가능한 사람을 본다", async () => {
+  it("방장이 마감된 약속에서 후보 블록의 창을 고르면 확정되고, 모두가 시작·끝과 참석 가능한 사람을 본다", async () => {
     const { host, member, promiseId } = await setUp();
     await submit(host, promiseId, from14to16);
     await submit(member, promiseId, from14to16);
@@ -99,27 +99,43 @@ describe("확정", () => {
     expect(res.status).toBe(200);
   });
 
-  describe("다시 계산해서 표시 후보가 아니면 409와 새 후보 목록", () => {
-    it("겹쳐서 표시되지 않는 시작 시각은 확정할 수 없다(RESULT-11-02)", async () => {
+  it("블록 안이면 최적 창이 아닌 시작 시각(30분씩 옮긴 창)도 확정할 수 있다", async () => {
+    const { host, member, promiseId } = await setUp();
+    await submit(host, promiseId, from14to17);
+    await submit(member, promiseId, from14to17);
+    await closePromise(host, promiseId);
+    // 블록은 14:00~17:00. 최적 창은 14:00이지만 14:30~16:30, 15:00~17:00도 고를 수 있다.
+
+    const res = await confirmPromise(host, promiseId, slotAt(0, "15:00"));
+
+    expect(res.status).toBe(200);
+    const body = res.body as { currentConfirmation: Confirmation };
+    expect(ms(body.currentConfirmation.startAt)).toBe(ms(slotAt(0, "15:00")));
+    expect(ms(body.currentConfirmation.endAt)).toBe(ms(slotAt(0, "17:00")));
+  });
+
+  describe("다시 계산해서 확정할 수 없는 창이면 409와 새 후보 블록", () => {
+    it("창 끝이 블록을 넘는 시작 시각은 확정할 수 없다", async () => {
       const { host, member, promiseId } = await setUp();
       await submit(host, promiseId, from14to17);
       await submit(member, promiseId, from14to17);
       await closePromise(host, promiseId);
-      // 표시 후보는 14:00~16:00 하나다. 14:30은 14:00과 겹쳐 건너뛰었다.
 
-      const res = await confirmPromise(host, promiseId, slotAt(0, "14:30"));
+      const res = await confirmPromise(host, promiseId, slotAt(0, "15:30"));
 
       expect(res.status).toBe(409);
       const body = res.body as {
         code: string;
-        details: { candidates: { startAt: string; participants: { nickname: string }[] }[] };
+        details: { blocks: { startAt: string; endAt: string; selectable: boolean }[] };
       };
       expect(body.code).toBe("INVALID_CONFIRMATION_CANDIDATE");
-      expect(body.details.candidates.map((c) => ms(c.startAt))).toEqual([ms(slotAt(0, "14:00"))]);
+      expect(body.details.blocks.map((b) => [ms(b.startAt), ms(b.endAt), b.selectable])).toEqual([
+        [ms(slotAt(0, "14:00")), ms(slotAt(0, "17:00")), true],
+      ]);
       expect((await getPromise(host, promiseId)).body).toMatchObject({ promiseStatus: "closed" });
     });
 
-    it("본 뒤에 한 명이 빠져 2명 미만이 된 후보는 확정할 수 없다", async () => {
+    it("본 뒤에 한 명이 빠져 2명 미만이 된 창은 확정할 수 없다", async () => {
       const { host, member, promiseId } = await setUp();
       await submit(host, promiseId, from14to16);
       await submit(member, promiseId, from14to16);
@@ -131,11 +147,11 @@ describe("확정", () => {
       expect(res.status).toBe(409);
       expect(res.body).toMatchObject({
         code: "INVALID_CONFIRMATION_CANDIDATE",
-        details: { candidates: [] },
+        details: { blocks: [] },
       });
     });
 
-    it("가능 인원만 바뀌고 여전히 표시 후보면 그대로 확정한다(RESULT-12-02)", async () => {
+    it("가능 인원만 바뀌고 여전히 확정할 수 있는 창이면 그대로 확정한다(RESULT-12-02)", async () => {
       const { host, member, promiseId } = await setUp();
       const third = createTestClient();
       await registerParticipant(third, promiseId, { nickname: "철수", pin: "2468" });

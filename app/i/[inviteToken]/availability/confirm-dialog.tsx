@@ -2,11 +2,17 @@
 
 import { useState } from "react";
 import { Button } from "@/app/_components/ui";
-import { ApiError, confirmationUrl, postJson, type ScheduledTime } from "../api";
+import {
+  ApiError,
+  confirmationUrl,
+  postJson,
+  type CandidateBlock,
+  type ScheduledTime,
+} from "../api";
 import { timeRangeLabel } from "../calendar";
 import { useCloseOnEscape } from "../use-close-on-escape";
 
-// 확정 확인 팝업(Figma 19). 방장이 표시된 후보 하나를 확정한다(STATE-API-05).
+// 확정 확인 팝업(Figma 19). 방장이 후보 블록 안에서 고른 창을 확정한다(STATE-API-05, candidate-blocks 03).
 // 방장이 참석할 수 없는 후보면 그 사실을 알린 뒤 확정한다(RESULT-04-02).
 export function ConfirmDialog({
   promiseId,
@@ -20,8 +26,8 @@ export function ConfirmDialog({
   candidate: ScheduledTime;
   hostParticipantId: string;
   onConfirmed: () => void;
-  /** 다시 계산해 보니 이 후보가 더 이상 표시 후보가 아닐 때(409). 응답에 담긴 새 후보 목록을 넘긴다. */
-  onCandidatesChanged: (candidates: ScheduledTime[]) => void;
+  /** 다시 계산해 보니 이 창을 더 이상 확정할 수 없을 때(409). 응답에 담긴 새 후보 블록을 넘긴다. */
+  onCandidatesChanged: (blocks: CandidateBlock[]) => void;
   onClose: () => void;
 }) {
   const [pending, setPending] = useState(false);
@@ -41,7 +47,7 @@ export function ConfirmDialog({
       if (e instanceof ApiError && e.code === "INVALID_CONFIRMATION_CANDIDATE") {
         // 본 뒤에 상황이 바뀌었다(2명 미만, 지난 시각 등). 새 후보로 다시 고르게 한다(RESULT-12-02).
         setStale(true);
-        onCandidatesChanged((e.details?.candidates as ScheduledTime[] | undefined) ?? []);
+        onCandidatesChanged((e.details?.blocks as CandidateBlock[] | undefined) ?? []);
       } else {
         setError(e instanceof ApiError ? e.message : "확정하지 못했어요. 다시 시도해 주세요.");
       }

@@ -13,14 +13,22 @@ import {
 
 // 후보 조회(STATE-API-10, RESULT-08-01·09-01·09-02·10-01). 계산 규칙 자체는 후보 계산 모듈의 단위 테스트가 본다.
 
+type Window = {
+  startAt: string;
+  endAt: string;
+  availableParticipantCount: number;
+  participants: { nickname: string }[];
+};
 type Candidates = {
   promiseStatus: string;
   calculatedAt: string;
-  candidates: {
+  durationMinutes: number;
+  blocks: {
+    date: string;
     startAt: string;
     endAt: string;
-    availableParticipantCount: number;
-    participants: { nickname: string }[];
+    selectable: boolean;
+    best: Window | null;
   }[];
 };
 
@@ -42,7 +50,7 @@ async function setUp() {
 }
 
 describe("후보 조회", () => {
-  it("모집 중에도 제출값 기준의 후보와 참석 가능한 사람의 닉네임을 보여준다", async () => {
+  it("모집 중에도 제출값 기준의 하루 단위 후보 블록과 최적 창의 참석 가능한 사람 닉네임을 보여준다", async () => {
     const { host, member, promiseId } = await setUp();
     await submitAvailability(host, promiseId, { baseVersion: 0, slots: twoHoursFrom14 });
     await submitAvailability(member, promiseId, { baseVersion: 0, slots: twoHoursFrom14 });
@@ -53,12 +61,29 @@ describe("후보 조회", () => {
     const body = res.body as Candidates;
     expect(body.promiseStatus).toBe("collecting");
     expect(body.calculatedAt).toMatch(/\.\d{3}\+09:00$/);
-    expect(body.candidates).toHaveLength(1);
-    const [candidate] = body.candidates;
-    expect(ms(candidate.startAt)).toBe(ms(slotAt(0, "14:00")));
-    expect(ms(candidate.endAt)).toBe(ms(slotAt(0, "16:00")));
-    expect(candidate.availableParticipantCount).toBe(2);
-    expect(candidate.participants.map((p) => p.nickname).sort()).toEqual(["승주", "혜승"]);
+    expect(body.durationMinutes).toBe(120);
+    expect(body.blocks).toHaveLength(1);
+    const [block] = body.blocks;
+    expect(block.date).toBe(slotAt(0, "14:00").slice(0, 10));
+    expect(ms(block.startAt)).toBe(ms(slotAt(0, "14:00")));
+    expect(ms(block.endAt)).toBe(ms(slotAt(0, "16:00")));
+    expect(block.selectable).toBe(true);
+    expect(ms(block.best!.startAt)).toBe(ms(slotAt(0, "14:00")));
+    expect(ms(block.best!.endAt)).toBe(ms(slotAt(0, "16:00")));
+    expect(block.best!.availableParticipantCount).toBe(2);
+    expect(block.best!.participants.map((p) => p.nickname).sort()).toEqual(["승주", "혜승"]);
+  });
+
+  it("약속 길이보다 짧은 블록은 선택할 수 없는 블록으로 보여준다", async () => {
+    const { host, member, promiseId } = await setUp();
+    const oneHour = [slotAt(0, "14:00"), slotAt(0, "14:30")];
+    await submitAvailability(host, promiseId, { baseVersion: 0, slots: oneHour });
+    await submitAvailability(member, promiseId, { baseVersion: 0, slots: oneHour });
+
+    const body = (await getCandidates(member, promiseId)).body as Candidates;
+
+    expect(body.blocks).toHaveLength(1);
+    expect(body.blocks[0]).toMatchObject({ selectable: false, best: null });
   });
 
   it("마감되면 같은 계산으로 최종 후보를 바로 보여준다", async () => {
@@ -71,7 +96,7 @@ describe("후보 조회", () => {
 
     const body = res.body as Candidates;
     expect(body.promiseStatus).toBe("closed");
-    expect(body.candidates).toHaveLength(1);
+    expect(body.blocks).toHaveLength(1);
   });
 
   it("제출하지 않은 선택과 탈퇴한 참여자의 슬롯은 후보에 들어가지 않는다", async () => {
@@ -86,7 +111,7 @@ describe("후보 조회", () => {
     const res = await getCandidates(member, promiseId);
 
     // 남은 제출자는 방장 한 명뿐이라 2명 이상인 후보가 없다.
-    expect((res.body as Candidates).candidates).toEqual([]);
+    expect((res.body as Candidates).blocks).toEqual([]);
   });
 
   it("2명 이상 겹치는 시간이 없으면 빈 목록이다(오류가 아니다)", async () => {
@@ -97,7 +122,7 @@ describe("후보 조회", () => {
     const res = await getCandidates(host, promiseId);
 
     expect(res.status).toBe(200);
-    expect((res.body as Candidates).candidates).toEqual([]);
+    expect((res.body as Candidates).blocks).toEqual([]);
   });
 
   it("등록하지 않은 사람은 후보를 볼 수 없다(401)", async () => {

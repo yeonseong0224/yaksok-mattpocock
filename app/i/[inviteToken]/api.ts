@@ -188,7 +188,17 @@ export type CandidateList = {
   promiseId: string;
   promiseStatus: OpenPromiseStatus;
   calculatedAt: string;
-  candidates: ScheduledTime[];
+  durationMinutes: number;
+  blocks: CandidateBlock[];
+};
+
+/** 하루 단위 후보 블록: 2명 이상 가능한 칸이 이어진 구간. best가 없으면 확정할 수 없다(candidate-blocks 02). */
+export type CandidateBlock = {
+  date: string;
+  startAt: string;
+  endAt: string;
+  selectable: boolean;
+  best: ScheduledTime | null;
 };
 
 export const candidatesUrl = (promiseId: string) => `${promiseUrl(promiseId)}/candidates`;

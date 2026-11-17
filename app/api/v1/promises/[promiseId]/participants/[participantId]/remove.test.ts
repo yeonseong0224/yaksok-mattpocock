@@ -57,7 +57,7 @@ describe("내보내기", () => {
     expect(roster.participants).toHaveLength(1);
     const board = (await getAvailability(host, promiseId)).body as { totalParticipants: number };
     expect(board.totalParticipants).toBe(1);
-    expect((await getCandidates(host, promiseId)).body).toMatchObject({ candidates: [] });
+    expect((await getCandidates(host, promiseId)).body).toMatchObject({ blocks: [] });
   });
 
   it("내보내진 사람은 다시 로그인하면 401이고, 같은 닉네임으로 다시 참여할 수 없다", async () => {

@@ -1,5 +1,5 @@
 import type { Prisma } from "@/prisma/generated/client";
-import { loadCandidates } from "@/lib/candidates/load-candidates";
+import { loadCandidateBlocks } from "@/lib/candidates/load-candidates";
 import { afterDeadlineExpiresAt, extendActiveSessions } from "@/lib/members/session";
 import { planSettingsChange, type SettingsChangeSummary } from "./change-impact";
 import { findPromise, type PromiseRow } from "./promise-state";
@@ -92,7 +92,7 @@ export async function applySettingsChange(
   }
 
   const updated = (await findPromise(tx, promise.id))!;
-  const candidates = await loadCandidates(tx, updated);
+  const blocks = await loadCandidateBlocks(tx, updated);
   return {
     ok: true,
     promise: updated,
@@ -109,7 +109,7 @@ export async function applySettingsChange(
       submissionsResetParticipantCount: impact.rangeGrew
         ? participants.filter((p) => p.availabilitySubmittedAt !== null).length
         : 0,
-      hasCandidates: candidates.length > 0,
+      hasCandidates: blocks.some((b) => b.best !== null),
     },
   };
 }

@@ -61,7 +61,7 @@ describe("본인 탈퇴", () => {
     expect(cookieMaxAge(res)).toBe(0);
     expect((await getMe(member, promiseId)).status).toBe(401);
     expect(await nicknamesOf(host, promiseId)).toEqual(["승주"]);
-    expect((await getCandidates(host, promiseId)).body).toMatchObject({ candidates: [] });
+    expect((await getCandidates(host, promiseId)).body).toMatchObject({ blocks: [] });
     const row = await prisma.participant.findFirstOrThrow({
       where: { promiseId, nickname: "혜승" },
       include: { availableSlots: true },

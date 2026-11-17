@@ -692,6 +692,8 @@ if (!response.ok) {
 
 `POST /api/v1/promises/{promiseId}/confirmation`
 
+> **2026-11-17 결정 (candidate-blocks 03)**: 요청한 `startAt`은 다시 계산한 후보 블록(STATE-API-10) 중 선택 가능한 블록 안의 30분 경계 시작이고, 창 끝(시작 + 약속 길이)이 블록을 넘지 않으며, 그 창 내내 2명 이상 함께 가능해야 한다. 아니면 `409 INVALID_CONFIRMATION_CANDIDATE`와 `details.blocks`(새 후보 블록, 후보 조회와 같은 모양). 아래 2026-11-10 결정의 (1)·(2)를 대신한다.
+
 > **2026-11-10 결정 (첫 슬라이스 스펙·RESULT-11-02·12-02, 티켓 09 구현)**: 아래 원안과 다르게 구현한다. (1) 화면에 표시된 후보(서로 겹치지 않는 최대 5개) 중에서만 확정할 수 있다. 목록 밖의 유효 후보는 허용하지 않는다. (2) 다시 계산한 결과 요청한 시작 시각이 표시 후보가 아니면 `409 INVALID_CONFIRMATION_CANDIDATE`와 `details.candidates`(새 후보 목록, 후보 조회와 같은 모양)를 돌려준다(원안의 422 대신). (3) 기한 전 collecting이면 "먼저 조기 마감" 안내와 함께 `409 INVALID_PROMISE_STATE`. (4) 응답과 STATE-API-01의 `currentConfirmation`에는 참석 가능한 참여자의 닉네임(`participants[]`)도 담는다. 확정 당시 목록은 저장하지 않고 현재 제출값으로 다시 계산한다(RESULT-13-02).
 
 현재 active 방장이 미래 유효 후보 하나를 확정한다. 최신 공통 가능 인원을 다시 검사하고 confirmed_start_at을 저장한다.
@@ -1126,6 +1128,8 @@ closed·confirmed 약속을 collecting으로 다시 열고 새 마감과 선택 
 ---
 
 ## STATE-API-10 — 공식 시간 후보 조회
+
+> **2026-11-17 결정 (candidate-blocks 02)**: 응답은 `candidates[]` 대신 `durationMinutes`와 `blocks[]`다. 블록 하나는 `{ date, startAt, endAt, selectable, best }`이고, `best`는 최적 창(`startAt`, `endAt`, `availableParticipantCount`, `participants[]`) 또는 `null`(선택할 수 없는 블록)이다. 규칙은 RESULT.md의 2026-11-17 결정을 따른다. 아래 원안의 `candidates[]` 표는 이 결정 전 모양이다.
 
 `GET /api/v1/promises/{promiseId}/candidates`
 

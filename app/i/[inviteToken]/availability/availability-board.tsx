@@ -24,7 +24,7 @@ import {
 import { clockRangesLabel, dayLabel, durationLabel, weekStartOf } from "../calendar";
 import { ParticipantRoster } from "../participant-home";
 import { PromiseDrawer } from "../promise-drawer";
-import { CandidateListPanel } from "./candidate-list";
+import { CandidateBlocksPanel, windowAt } from "./candidate-blocks";
 import { ConfirmDialog } from "./confirm-dialog";
 import { DateJumpDialog } from "./date-jump-dialog";
 import { HostSettingsDialog } from "./host-settings-dialog";
@@ -167,6 +167,8 @@ export function AvailabilityBoard({
   // 시간 수정 시트를 연 날짜, 선택 내역 시트
   const [editingDay, setEditingDay] = useState<string | null>(null);
   const [summaryOpen, setSummaryOpen] = useState(false);
+  // 모바일 "약속 확정하기"로 여는 전체 화면 후보 고르기(candidate-blocks 03)
+  const [pickerOpen, setPickerOpen] = useState(false);
   // 모바일 "반복" 버튼으로 연 반복 시트(연 버튼, vote-ui-extras 04)
   const [planningFrom, setPlanningFrom] = useState<HTMLElement | null>(null);
   // 후보 목록과 같은 키라 한 번만 조회된다. 확정 버튼을 보여줄 슬롯(표시 후보의 시작)을 알기 위해 쓴다.
@@ -368,7 +370,12 @@ export function AvailabilityBoard({
   const inspectedCandidate =
     inspecting === null
       ? undefined
-      : candidates.data?.candidates.find((c) => Date.parse(c.startAt) === inspecting);
+      : (windowAt(
+          candidates.data?.blocks ?? [],
+          data.participants,
+          inspecting,
+          settings.durationMinutes,
+        ) ?? undefined);
   const showCandidates = candidatesOpen;
   const deadline = toKstIso(new Date(settings.votingDeadlineAt));
   const monthDay = (d: string) => d.slice(5).replace("-", ".");
@@ -454,14 +461,14 @@ export function AvailabilityBoard({
             ? "제출 완료"
             : null;
     const selectedDays = new Set(futureSelected.map((ms) => kstDate(new Date(ms)))).size;
-    const topCandidate = candidates.data?.candidates[0];
+    const hasSelectable = candidates.data?.blocks.some((b) => b.selectable) ?? false;
     const heatPrimary =
       data!.status === "confirmed"
         ? { text: "확정 결과 보기", onClick: onConfirmed }
         : canConfirm
           ? {
               text: "약속 확정하기",
-              onClick: topCandidate ? () => setConfirming(topCandidate) : undefined,
+              onClick: hasSelectable ? () => setPickerOpen(true) : undefined,
             }
           : { text: editable ? "마감 후 확정할 수 있어요" : "방장 확정 대기" };
 
@@ -493,9 +500,11 @@ export function AvailabilityBoard({
             다시 조율하기
           </Button>
         )}
-        <CandidateListPanel
+        <CandidateBlocksPanel
           promiseId={promiseId}
           pollMs={POLL_MS}
+          participants={data!.participants}
+          total={data!.totalParticipants}
           onPick={(date) => {
             setWeekStart(weekStartOf(date));
             setTab("heatmap");
@@ -916,7 +925,10 @@ export function AvailabilityBoard({
                   <Button
                     onClick={() => {
                       setCandidatesOpen(true);
-                      setNotice({ tone: "info", text: "아래 후보 중 확정할 시간을 골라 주세요." });
+                      setNotice({
+                        tone: "info",
+                        text: "아래 후보 카드를 눌러 상세 시간을 정해 주세요.",
+                      });
                     }}
                     className="sm:w-40"
                   >
@@ -931,9 +943,11 @@ export function AvailabilityBoard({
               </div>
             </BottomBar>
             {showCandidates && (
-              <CandidateListPanel
+              <CandidateBlocksPanel
                 promiseId={promiseId}
                 pollMs={POLL_MS}
+                participants={data.participants}
+                total={data.totalParticipants}
                 onPick={(date) => {
                   setWeekStart(weekStartOf(date));
                   setTab("heatmap");
@@ -970,6 +984,50 @@ export function AvailabilityBoard({
         </>
       )}
 
+      {pickerOpen && mobile && canConfirm && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="picker-title"
+          className="fixed inset-0 z-20 flex flex-col bg-surface"
+        >
+          <div className="flex h-14 shrink-0 items-center gap-2 border-b border-line px-4">
+            <button
+              type="button"
+              aria-label="후보 고르기 닫기"
+              onClick={() => setPickerOpen(false)}
+              className="-ml-2 flex h-11 w-11 items-center justify-center rounded-lg text-lg text-ink hover:bg-canvas"
+            >
+              ‹
+            </button>
+            <span className="text-lg font-bold text-brand-ink">✓ 약속 잡기</span>
+          </div>
+          <div className="shrink-0 px-5 pt-4 pb-3.5">
+            <h2 id="picker-title" className="mb-1.5 text-[21px] font-bold tracking-tight">
+              약속 후보를 골라주세요
+            </h2>
+            <p className="text-[12.5px] leading-5 text-muted">
+              소요 시간 {durationLabel(settings.durationMinutes)} 이상 함께 가능한 날만 고를 수
+              있어요 · 참여자 {data.totalParticipants}명
+            </p>
+          </div>
+          <CandidateBlocksPanel
+            variant="screen"
+            promiseId={promiseId}
+            pollMs={POLL_MS}
+            participants={data.participants}
+            total={data.totalParticipants}
+            onPick={(date) => {
+              setWeekStart(weekStartOf(date));
+              setTab("heatmap");
+              setPickerOpen(false);
+            }}
+            onConfirm={setConfirming}
+            onReopen={(opener) => setReopenFrom(opener)}
+            onCancelPromise={(opener) => setCancelFrom(opener)}
+          />
+        </div>
+      )}
       {editingDay && editable && (
         <DayEditSheet
           key={editingDay}
@@ -1066,7 +1124,7 @@ export function AvailabilityBoard({
           }}
           onCandidatesChanged={(latest) => {
             // 새 후보 목록으로 바로 다시 그리고 펼친다(스토리 69). 다시 조회하지 않는다.
-            void candidates.mutate((current) => current && { ...current, candidates: latest }, {
+            void candidates.mutate((current) => current && { ...current, blocks: latest }, {
               revalidate: false,
             });
             setCandidatesOpen(true);
