@@ -539,7 +539,7 @@ export function AvailabilityBoard({
     );
 
     const navButton =
-      "flex h-11 items-center justify-center rounded-lg border border-line bg-surface text-brand-ink";
+      "flex h-10 items-center justify-center rounded-lg border border-line bg-surface text-brand-ink";
     return (
       <>
         <PromiseDrawer>
@@ -563,7 +563,7 @@ export function AvailabilityBoard({
           </h2>
           <div
             role="tablist"
-            className="grid h-11 grid-cols-2 gap-0.75 rounded-[10px] bg-line/70 p-0.75"
+            className="grid h-10 grid-cols-2 gap-0.75 rounded-[10px] bg-line/70 p-0.75"
           >
             {(["mine", "heatmap"] as const).map((t) => (
               <button
@@ -582,7 +582,7 @@ export function AvailabilityBoard({
             <button
               type="button"
               onClick={() => setWeekStart(weekStartOf(firstVisible))}
-              className={`${navButton} w-11 shrink-0 text-xs`}
+              className={`${navButton} w-10 shrink-0 text-xs`}
             >
               오늘
             </button>
@@ -590,7 +590,7 @@ export function AvailabilityBoard({
               type="button"
               aria-label="이전 주"
               onClick={() => setWeekStart(addDays(shownWeek, -7))}
-              className={`${navButton} w-11 shrink-0 text-lg`}
+              className={`${navButton} w-10 shrink-0 text-lg`}
             >
               ‹
             </button>
@@ -598,7 +598,7 @@ export function AvailabilityBoard({
               type="button"
               aria-label="다음 주"
               onClick={() => setWeekStart(addDays(shownWeek, 7))}
-              className={`${navButton} w-11 shrink-0 text-lg`}
+              className={`${navButton} w-10 shrink-0 text-lg`}
             >
               ›
             </button>
@@ -613,19 +613,19 @@ export function AvailabilityBoard({
               </span>
             </button>
           </div>
-          <div className="my-1 flex h-11 items-center justify-between gap-2">
+          <div className="my-0.5 flex h-10 items-center justify-between gap-2">
             {tab === "mine" ? (
               <>
                 <span className="truncate text-[10px] text-muted">
                   {!editable
                     ? "마감되어 수정할 수 없어요"
                     : touchMode === "select"
-                      ? "끌어서 선택 · 2초 누르면 반복"
-                      : "화면만 움직여요 · 2초 누르면 반복"}
+                      ? "끌어서 선택 · 1초 누르면 반복"
+                      : "화면만 움직여요 · 1초 누르면 반복"}
                 </span>
                 {editable && (
                   <div
-                    className="flex h-8.25 shrink-0 gap-0.75 rounded-[7px] border border-line bg-surface p-0.5"
+                    className="flex h-8 shrink-0 gap-0.75 rounded-[7px] border border-line bg-surface p-0.5"
                     aria-label="시간표 조작 모드"
                   >
                     {(["select", "scroll"] as const).map((m) => (
@@ -766,7 +766,7 @@ export function AvailabilityBoard({
     <div
       className={
         mobile
-          ? "-mx-4 -my-10 flex h-[calc(100dvh-2.75rem)] flex-col bg-canvas"
+          ? "-mx-4 -my-10 flex h-[calc(100dvh-4rem)] flex-col bg-canvas"
           : "grid gap-6 lg:grid-cols-[240px_1fr]"
       }
     >
@@ -829,7 +829,7 @@ export function AvailabilityBoard({
                       {touchMode === "select"
                         ? "선택 모드 · 드래그하면 시간을 고르거나 풀어요. 화면을 움직이려면 스크롤 모드로 바꾸세요."
                         : "스크롤 모드 · 화면을 움직여요. 시간을 고르려면 선택 모드로 바꾸세요."}{" "}
-                      날짜나 시간을 2초 동안 누르고 있으면 반복할 수 있어요.
+                      날짜나 시간을 1초 동안 누르고 있으면 반복할 수 있어요.
                     </span>
                     <span className="pointer-coarse:hidden">
                       30분 단위 · 빈 칸부터 드래그하면 추가, 선택한 칸부터 드래그하면 해제. 날짜나
@@ -991,16 +991,16 @@ export function AvailabilityBoard({
           aria-labelledby="picker-title"
           className="fixed inset-0 z-20 flex flex-col bg-surface"
         >
-          <div className="flex h-11 shrink-0 items-center gap-1 border-b border-line px-3.5">
+          <div className="flex h-14 shrink-0 items-center gap-2 border-b border-line px-4">
             <button
               type="button"
               aria-label="후보 고르기 닫기"
               onClick={() => setPickerOpen(false)}
-              className="-ml-1.5 flex h-9 w-9 items-center justify-center rounded-lg text-base text-ink hover:bg-canvas"
+              className="-ml-2 flex h-11 w-11 items-center justify-center rounded-lg text-lg text-ink hover:bg-canvas"
             >
               ‹
             </button>
-            <span className="text-xs font-bold text-brand-ink">✓ 약속 잡기</span>
+            <span className="text-lg font-bold text-brand-ink">✓ 약속 잡기</span>
           </div>
           <div className="shrink-0 px-5 pt-4 pb-3.5">
             <h2 id="picker-title" className="mb-1.5 text-[21px] font-bold tracking-tight">
