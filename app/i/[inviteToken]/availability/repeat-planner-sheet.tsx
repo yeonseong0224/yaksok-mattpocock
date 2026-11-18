@@ -145,7 +145,7 @@ export function RepeatPlannerSheet({
               min={firstDate}
               max={range.dateRangeEnd}
               onChange={(e) => setFrom(e.target.value || firstDate)}
-              className="h-11 min-w-0 flex-1 rounded-lg border border-line bg-surface px-2 text-sm"
+              className="h-11 min-w-0 flex-1 rounded-lg border border-line bg-surface px-2 text-base sm:text-sm"
             />
             <span className="text-muted">~</span>
             <label className="sr-only" htmlFor="repeat-until">
@@ -158,7 +158,7 @@ export function RepeatPlannerSheet({
               min={from}
               max={range.dateRangeEnd}
               onChange={(e) => setUntil(e.target.value || range.dateRangeEnd)}
-              className="h-11 min-w-0 flex-1 rounded-lg border border-line bg-surface px-2 text-sm"
+              className="h-11 min-w-0 flex-1 rounded-lg border border-line bg-surface px-2 text-base sm:text-sm"
             />
           </div>
         </>

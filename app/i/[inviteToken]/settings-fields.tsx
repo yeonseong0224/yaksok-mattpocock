@@ -134,11 +134,11 @@ export function SettingsFields({
         <p id="date-range-label" className="mb-2 text-sm font-medium">
           ① 입력 가능 날짜
         </p>
-        <div className="mb-3 grid grid-cols-2 gap-3 text-sm">
+        <div className="mb-2 grid grid-cols-2 gap-2 text-sm sm:mb-3 sm:gap-3">
           <ReadonlyBox label="시작" value={range.startDate} />
           <ReadonlyBox label="종료" value={range.endDate} />
         </div>
-        <div className="grid gap-4 md:grid-cols-[minmax(0,360px)_1fr]">
+        <div className="grid gap-2 sm:gap-4 md:grid-cols-[minmax(0,360px)_1fr]">
           <RangeCalendar
             value={range}
             onChange={onRangeChange}
@@ -146,8 +146,10 @@ export function SettingsFields({
             isSelectableStart={(date) => canStartOn(date, now, keptStartDate)}
             isSelectableEnd={(start, date) => canEndOn(start, date, now, keptStartDate)}
           />
-          <div className="text-sm leading-7 text-muted">
-            <p className="mb-2 text-base font-bold text-ink">원하는 날짜를 선택하세요</p>
+          <div className="text-xs leading-5 text-muted sm:text-sm sm:leading-7">
+            <p className="mb-1 text-sm font-bold text-ink sm:mb-2 sm:text-base">
+              원하는 날짜를 선택하세요
+            </p>
             <p>‹ / › 이전·다음 달</p>
             <p>첫 클릭 시작일, 두 번째 클릭 종료일</p>
             <p>파란 영역 입력 가능한 날짜</p>
@@ -157,7 +159,7 @@ export function SettingsFields({
         <FieldError id="dateRange-error">{errors.dateRange}</FieldError>
       </section>
 
-      <div className="grid gap-6 md:grid-cols-2">
+      <div className="grid gap-4 sm:gap-6 md:grid-cols-2">
         <Labeled
           id="participantLimit"
           label="② 참여 인원 수 · 방장 포함"

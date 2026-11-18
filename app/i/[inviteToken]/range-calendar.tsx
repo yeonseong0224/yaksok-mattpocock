@@ -48,7 +48,7 @@ export function RangeCalendar({
   }
 
   return (
-    <div className="rounded-xl border border-line bg-surface p-3">
+    <div className="rounded-xl border border-line bg-surface p-2 sm:p-3">
       <MonthHeader month={month} onChange={setMonth} />
       <div className="grid grid-cols-7 gap-1 text-center" role="grid">
         {WEEKDAYS.map((d) => (
@@ -102,7 +102,7 @@ function DayCell({
       onClick={onClick}
       aria-pressed={tone !== "none"}
       aria-label={date}
-      className={`h-10 rounded-lg text-sm disabled:cursor-not-allowed ${look}`}
+      className={`h-9 rounded-lg text-sm disabled:cursor-not-allowed sm:h-10 ${look}`}
     >
       {Number(date.slice(8, 10))}
     </button>

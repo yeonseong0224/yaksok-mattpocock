@@ -766,7 +766,7 @@ export function AvailabilityBoard({
     <div
       className={
         mobile
-          ? "-mx-4 -my-10 flex h-[calc(100dvh-4rem)] flex-col bg-canvas"
+          ? "-mx-4 -my-10 flex h-[calc(100dvh-2.75rem)] flex-col bg-canvas"
           : "grid gap-6 lg:grid-cols-[240px_1fr]"
       }
     >
@@ -991,16 +991,16 @@ export function AvailabilityBoard({
           aria-labelledby="picker-title"
           className="fixed inset-0 z-20 flex flex-col bg-surface"
         >
-          <div className="flex h-14 shrink-0 items-center gap-2 border-b border-line px-4">
+          <div className="flex h-11 shrink-0 items-center gap-1 border-b border-line px-3.5">
             <button
               type="button"
               aria-label="후보 고르기 닫기"
               onClick={() => setPickerOpen(false)}
-              className="-ml-2 flex h-11 w-11 items-center justify-center rounded-lg text-lg text-ink hover:bg-canvas"
+              className="-ml-1.5 flex h-9 w-9 items-center justify-center rounded-lg text-base text-ink hover:bg-canvas"
             >
               ‹
             </button>
-            <span className="text-lg font-bold text-brand-ink">✓ 약속 잡기</span>
+            <span className="text-xs font-bold text-brand-ink">✓ 약속 잡기</span>
           </div>
           <div className="shrink-0 px-5 pt-4 pb-3.5">
             <h2 id="picker-title" className="mb-1.5 text-[21px] font-bold tracking-tight">

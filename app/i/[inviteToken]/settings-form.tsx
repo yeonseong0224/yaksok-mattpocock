@@ -88,15 +88,15 @@ export function SettingsForm({
   const now = new Date();
 
   return (
-    <div className="grid gap-8 lg:grid-cols-[220px_1fr]">
-      <aside className="flex flex-col gap-6">
+    <div className="grid gap-5 sm:gap-8 lg:grid-cols-[220px_1fr]">
+      <aside className="flex flex-col gap-3 sm:gap-6">
         <div>
-          <h2 className="text-2xl leading-snug font-bold">
+          <h2 className="text-xl leading-snug font-bold sm:text-2xl">
             우리 언제
             <br />
             만날까요?
           </h2>
-          <p className="mt-3 text-sm leading-6 text-muted">
+          <p className="mt-1.5 text-xs leading-5 text-muted sm:mt-3 sm:text-sm sm:leading-6">
             날짜 범위와 인원을 정하고 친구들에게 링크를 보내세요.
           </p>
         </div>
@@ -128,8 +128,8 @@ export function SettingsForm({
         )}
       </aside>
 
-      <form onSubmit={submit} noValidate className="flex flex-col gap-6">
-        <h1 className="text-2xl font-bold">새 약속 만들기</h1>
+      <form onSubmit={submit} noValidate className="flex flex-col gap-4 sm:gap-6">
+        <h1 className="text-xl font-bold sm:text-2xl">새 약속 만들기</h1>
 
         <SettingsFields
           values={{ title, range, participantLimit, deadline, durationMinutes }}
@@ -171,8 +171,8 @@ function Preview({
 }) {
   const short = (d: string | null) => (d ? d.slice(5).replace("-", ".") : "…");
   return (
-    <div className="rounded-xl bg-surface p-4 text-xs leading-6 text-muted">
-      <p className="mb-1 text-sm font-medium text-brand-ink">약속 미리보기</p>
+    <div className="rounded-xl bg-surface p-3 text-xs leading-5 text-muted sm:p-4 sm:leading-6">
+      <p className="mb-1 text-[13px] font-medium text-brand-ink sm:text-sm">약속 미리보기</p>
       <p>{title.trim() || "약속 이름"}</p>
       <p>
         {short(range.startDate)} – {short(range.endDate)}
