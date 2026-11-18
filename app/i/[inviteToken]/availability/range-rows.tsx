@@ -35,7 +35,7 @@ export function RangeRows({
   }
 
   const selectClass =
-    "h-11 min-w-0 flex-1 rounded-lg border border-line bg-surface px-1.5 text-sm outline-none focus:ring-2 focus:ring-brand/30";
+    "h-11 min-w-0 flex-1 rounded-lg border border-line bg-surface px-1.5 text-base outline-none sm:text-sm focus:ring-2 focus:ring-brand/30";
 
   return (
     <>

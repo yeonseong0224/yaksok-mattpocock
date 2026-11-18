@@ -8,6 +8,7 @@ export const HEADER_START_SLOT_ID = "app-header-start";
 
 export function AppHeader() {
   return (
+    // 높이를 바꾸면 모바일 시간표의 높이 계산(availability-board)도 맞춘다.
     <header className="flex h-16 items-center border-b border-line bg-surface px-5">
       <div id={HEADER_START_SLOT_ID} className="contents" />
       <Link href="/" className="text-lg font-bold text-brand-ink">
@@ -79,7 +80,8 @@ export function FieldError({ id, children }: { id: string; children?: ReactNode 
 }
 
 export function inputClass(invalid = false) {
-  return `h-11 w-full rounded-lg border bg-surface px-3.5 text-sm outline-none focus:ring-2 focus:ring-brand/30 ${
+  // iOS는 16px보다 작은 입력칸을 누르면 화면을 확대한다. 그래서 모바일에서는 16px로 둔다.
+  return `h-11 w-full rounded-lg border bg-surface px-3.5 text-base outline-none sm:text-sm focus:ring-2 focus:ring-brand/30 ${
     invalid ? "border-danger text-danger" : "border-line"
   }`;
 }

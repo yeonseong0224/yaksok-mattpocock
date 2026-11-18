@@ -21,7 +21,7 @@ import { WEEKDAYS, weekday } from "../calendar";
 //
 // 터치(Figma 23·24, vote-ui-extras 02):
 // - 선택 모드에서는 터치 드래그가 위와 같이 선택하고, 스크롤 모드에서는 화면이 움직인다(슬롯을 바꾸지 않는다).
-// - 날짜 열(머리글·슬롯)을 2초 동안 누르고 있으면 그 날짜의 반복 메뉴가 열린다. 데스크톱의 우클릭에 해당한다.
+// - 날짜 열(머리글·슬롯)을 1초 동안 누르고 있으면 그 날짜의 반복 메뉴가 열린다. 데스크톱의 우클릭에 해당한다.
 //
 // 모바일 변형(variant="mobile", vote-ui-extras 03):
 // - 7일이 화면 폭에 다 들어가고, 시간은 격자 안에서 위아래로만 움직인다. 날짜 머리글은 위에 붙어 있다.
@@ -63,8 +63,8 @@ const MOBILE_ROW_PX = 22;
 const EDGE_PX = 24;
 const EDGE_STEP_PX = 8;
 
-/** 길게 누르기로 반복 메뉴를 여는 시간 */
-const LONG_PRESS_MS = 2000;
+/** 길게 누르기로 반복 메뉴를 여는 시간(2026-11-18: 2초 → 1초) */
+const LONG_PRESS_MS = 1000;
 /** 이만큼 움직이면 길게 누르기가 아니라 드래그·스크롤로 본다 */
 const LONG_PRESS_SLOP_PX = 10;
 
@@ -277,7 +277,7 @@ export function WeekGrid({
     const column = e.target instanceof Element ? e.target.closest<HTMLElement>("[data-day]") : null;
     if (!column) return;
     e.preventDefault();
-    // 터치의 길게 누르기는 startPress가 2초 기준으로 따로 연다.
+    // 터치의 길게 누르기는 startPress가 1초 기준으로 따로 연다.
     // 키보드(메뉴 키·Shift+F10)로 열면 좌표가 0이다.
     const fromKeyboard = e.clientX === 0 && e.clientY === 0;
     if (lastPointerType.current !== "mouse" && !fromKeyboard) return;
