@@ -49,7 +49,7 @@ export function PromiseDrawer({
             aria-label="약속 정보 열기"
             aria-expanded={open}
             onClick={() => setOpen(true)}
-            className="mr-3 flex h-10 w-10 items-center justify-center rounded-lg bg-brand text-lg text-white shadow-sm hover:bg-brand-strong lg:hidden"
+            className="mr-3 flex h-10 w-10 items-center justify-center rounded-lg border border-brand/30 bg-brand/15 text-lg text-brand-ink hover:bg-brand/25 lg:hidden"
           >
             ☰
           </button>,
